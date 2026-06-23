@@ -1,6 +1,7 @@
+import { Copy } from "lucide-react";
 import { useStore } from "../store";
 import { CodeEditor } from "./CodeEditor";
-import { IconButton } from "./primitives";
+import { IconButton, PaneHeader } from "./primitives";
 
 export function ResultPane() {
   const target = useStore((s) => s.form.target);
@@ -11,33 +12,14 @@ export function ResultPane() {
   const status = useStore((s) => s.stream.status);
 
   const copy = () => generated && navigator.clipboard.writeText(generated);
-  const download = () => {
-    if (!generated) return;
-    const ext = target === "cypher" ? "cql" : target === "aql" ? "aql" : "groovy";
-    const blob = new Blob([generated], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `query.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Result · {target}
-        </span>
-        <div className="flex items-center gap-1">
-          <IconButton onClick={copy} disabled={!generated} title="Copy">
-            ⧉
-          </IconButton>
-          <IconButton onClick={download} disabled={!generated} title="Download">
-            ↓
-          </IconButton>
-        </div>
-      </div>
+      <PaneHeader title={target}>
+        <IconButton onClick={copy} disabled={!generated} title="Copy">
+          <Copy className="h-4 w-4" />
+        </IconButton>
+      </PaneHeader>
       <div className="min-h-0 flex-1">
         {generated ? (
           <CodeEditor value={generated} language="sql" readOnly theme={theme} />

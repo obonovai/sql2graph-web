@@ -1,5 +1,6 @@
 import { useStore } from "../store";
 import { CodeEditor } from "./CodeEditor";
+import { PaneHeader } from "./primitives";
 
 export function SqlEditor() {
   const sql = useStore((s) => s.form.sql);
@@ -9,12 +10,7 @@ export function SqlEditor() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          SQL input
-        </span>
-        <span className="text-[11px] text-slate-400">⌘/Ctrl + ↵ to translate</span>
-      </div>
+      <PaneHeader title="SQL" />
       <div className="min-h-0 flex-1">
         <CodeEditor
           value={sql}

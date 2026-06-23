@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Play, Square } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useStore } from "./store";
 import { CollapsibleSidebar } from "./components/Sidebar";
@@ -22,16 +23,15 @@ function Actions() {
   const translate = useStore((s) => s.translate);
   const stop = useStore((s) => s.stop);
   const clearWorkspace = useStore((s) => s.clearWorkspace);
-  const resetAll = useStore((s) => s.resetAll);
 
   const running = RUNNING.has(status);
   const canTranslate = !running && !!sql.trim() && !!validity?.valid;
 
   return (
-    <div className="flex items-center justify-center gap-2 border-t border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
+    <div className="flex items-center justify-start gap-2 border-t border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
       {running ? (
         <Button variant="danger" onClick={stop}>
-          ◼ Stop
+          <Square className="h-4 w-4" /> Stop
         </Button>
       ) : (
         <Button
@@ -40,19 +40,12 @@ function Actions() {
           disabled={!canTranslate}
           title={!sql.trim() ? "Enter a SQL query" : !validity?.valid ? "Provide a valid schema mapping" : "Translate"}
         >
-          ▸ Translate
+          <Play className="h-4 w-4" /> Translate
         </Button>
       )}
       <Button variant="default" onClick={clearWorkspace} disabled={running}>
         Clear
       </Button>
-      <button
-        onClick={resetAll}
-        disabled={running}
-        className="ml-2 text-[11px] text-slate-400 hover:text-slate-600 disabled:opacity-40 dark:hover:text-slate-200"
-      >
-        reset all
-      </button>
     </div>
   );
 }

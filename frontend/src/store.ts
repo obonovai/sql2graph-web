@@ -141,7 +141,6 @@ interface Store {
   translate: () => Promise<void>;
   stop: () => void;
   clearWorkspace: () => void;
-  resetAll: () => void;
   canTranslate: () => boolean;
 }
 
@@ -393,18 +392,6 @@ export const useStore = create<Store>()(
 
       clearWorkspace: () =>
         set((s) => ({ form: { ...s.form, sql: "" }, stream: INITIAL_STREAM, features: [] })),
-
-      resetAll: () =>
-        set((s) => ({
-          form: {
-            ...DEFAULT_FORM,
-            llm: { ...DEFAULT_FORM.llm, model: modelDefault(s.options, DEFAULT_FORM.llm.provider) },
-            validation: { ...DEFAULT_FORM.validation, server: { ...EMPTY_SERVER } },
-          },
-          stream: INITIAL_STREAM,
-          features: [],
-          mappingValidity: null,
-        })),
     }),
     {
       name: "rows2graph-web",

@@ -235,10 +235,12 @@ export function Slider({
 export function Chip({
   children,
   tone = "default",
+  size = "sm",
   title,
 }: {
   children: ReactNode;
   tone?: "default" | "green" | "red" | "amber" | "indigo";
+  size?: "sm" | "md";
   title?: string;
 }) {
   const tones: Record<string, string> = {
@@ -248,13 +250,30 @@ export function Chip({
     amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     indigo: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
   };
+  // `sm` = compact pill (FeatureChips); `md` = h-7 so it aligns with the toolbar's IconButton.
+  const sizes: Record<string, string> = {
+    sm: "px-2 py-0.5 text-[11px]",
+    md: "h-7 px-2.5 text-xs",
+  };
   return (
     <span
       title={title}
-      className={cls("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", tones[tone])}
+      className={cls("inline-flex items-center gap-1 rounded-full font-medium", sizes[size], tones[tone])}
     >
       {children}
     </span>
+  );
+}
+
+// Fixed-height (h-9) header for an editor pane. The fixed height — not padding —
+// is what keeps two side-by-side panes aligned whether or not they carry an
+// action in the right-hand `children` slot.
+export function PaneHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="flex h-9 shrink-0 items-center justify-between gap-1 border-b border-slate-200 px-3 dark:border-slate-700">
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</span>
+      {children}
+    </div>
   );
 }
 

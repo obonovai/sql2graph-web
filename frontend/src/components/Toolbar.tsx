@@ -1,5 +1,6 @@
+import { ChevronDown, Moon, Sun } from "lucide-react";
 import { useStore } from "../store";
-import { Chip, IconButton, Select, cls } from "./primitives";
+import { Button, Chip, IconButton, Select, cls } from "./primitives";
 
 export function Toolbar() {
   const target = useStore((s) => s.form.target);
@@ -31,26 +32,28 @@ export function Toolbar() {
         />
       </div>
 
-      <button
+      <Button
+        variant="default"
+        className="h-9"
         onClick={() => setMappingOpen(!mappingOpen)}
-        className={cls(
-          "inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm",
-          "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700",
-        )}
         title="Toggle the schema-mapping editor"
       >
         <span className={cls("h-2 w-2 rounded-full", dot)} />
-        <span>Schema mapping (YAML)</span>
-        <span className="text-slate-400">{mappingOpen ? "▾" : "▸"}</span>
-      </button>
+        Schema mapping (YAML)
+        <ChevronDown
+          className={cls("h-3.5 w-3.5 text-slate-400 transition-transform", mappingOpen && "rotate-180")}
+        />
+      </Button>
 
       <div className="ml-auto flex items-center gap-2">
-        <Chip tone="indigo" title="Active model">
+        <Chip tone="indigo" size="md" title="Active model">
           {provider} / {model}
         </Chip>
-        <Chip title="Validation mode">{mode}</Chip>
+        <Chip size="md" title="Validation mode">
+          {mode}
+        </Chip>
         <IconButton onClick={toggleTheme} title="Toggle light/dark">
-          {theme === "light" ? "☾" : "☀"}
+          {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
         </IconButton>
       </div>
     </div>
