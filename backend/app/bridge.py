@@ -34,6 +34,7 @@ from rows2graph import (
     FixGeneratedEvent,
     GeneratedEvent,
     MaxIterationsReachedEvent,
+    StalledEvent,
     TranslationEvent,
     ValidatedEvent,
 )
@@ -58,6 +59,8 @@ def _event_to_sse(event: TranslationEvent) -> dict[str, str]:
             return _sse("validated", {"iteration": i, "query": q, "errors": list(errs), "passed": passed})
         case FixGeneratedEvent(iteration=i, query=q):
             return _sse("fix", {"iteration": i, "query": q})
+        case StalledEvent(iteration=i, query=q, errors=errs):
+            return _sse("stalled", {"iteration": i, "query": q, "errors": list(errs)})
         case MaxIterationsReachedEvent(iteration=i, errors=errs):
             return _sse("max_iterations", {"iteration": i, "errors": list(errs)})
         case CompletedEvent(result=result):

@@ -51,7 +51,9 @@ export function StatusStrip() {
         body = `✓ success · ${summary}${tokens}`;
       } else {
         tone = "text-rose-600 dark:text-rose-400 font-medium";
-        body = `✗ max_iterations_reached · ${summary}${tokens}`;
+        // Show the library's actual outcome — "stalled" (gave up early after a
+        // no-progress escalation) reads differently from "max_iterations_reached".
+        body = `✗ ${s.finalStatus ?? "max_iterations_reached"} · ${summary}${tokens}`;
       }
       break;
     }

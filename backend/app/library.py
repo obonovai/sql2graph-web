@@ -64,6 +64,7 @@ def build_model_config(llm: LlmSettings) -> ModelConfig:
                 "host": host,
                 "temperature": llm.temperature,
                 "num_ctx": llm.num_ctx,
+                "repeat_penalty": llm.repeat_penalty,
                 "max_retries": llm.max_retries,
             }
         )

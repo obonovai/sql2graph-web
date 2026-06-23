@@ -28,6 +28,7 @@ class LlmSettings(BaseModel):
     # Ollama only:
     num_ctx: int | None = None
     host: str | None = None  # falls back to OLLAMA_HOST env on the backend
+    repeat_penalty: float | None = None  # >1.0 discourages the degenerate repeat loop
     # Anthropic only:
     max_output_tokens: int | None = None
     # api_key is intentionally absent — the Anthropic SDK reads ANTHROPIC_API_KEY

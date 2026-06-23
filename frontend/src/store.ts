@@ -53,6 +53,7 @@ interface StreamState {
   validationPassed: boolean | null;
   durationSeconds: number | null;
   iterationsUsed: number | null;
+  finalStatus: string | null; // library result.status: success | max_iterations_reached | stalled
   tokenUsage: TokenUsage | null;
   errorMessage: string | null;
   chips: IterationChip[];
@@ -75,8 +76,9 @@ const DEFAULT_FORM: FormState = {
     model: "", // seeded from the library config via /api/options (see modelDefault)
     temperature: 0.1,
     max_retries: 3,
-    num_ctx: 8192,
+    num_ctx: 16384,
     host: "",
+    repeat_penalty: null, // seeded from /api/options (config/models/ollama.yaml)
     max_output_tokens: 4096,
   },
   validation: { mode: "syntax", max_iterations: 3, server: { ...EMPTY_SERVER } },
@@ -93,6 +95,7 @@ const INITIAL_STREAM: StreamState = {
   validationPassed: null,
   durationSeconds: null,
   iterationsUsed: null,
+  finalStatus: null,
   tokenUsage: null,
   errorMessage: null,
   chips: [],
@@ -149,6 +152,15 @@ function modelDefault(options: Options | null, provider: Provider): string {
   return typeof m === "string" ? m : "";
 }
 
+// Numeric Ollama defaults (num_ctx, repeat_penalty) likewise come from
+// config/models/ollama.yaml via /api/options — keep the YAML the single source
+// of truth. Returns null when the key is absent, which means "let the
+// library/Ollama default apply".
+function ollamaDefault(options: Options | null, key: string): number | null {
+  const v = options?.defaults?.ollama?.[key];
+  return typeof v === "number" ? v : null;
+}
+
 function buildRequest(form: FormState): TranslateRequest {
   const { mode, max_iterations, server } = form.validation;
   let server_config = null as TranslateRequest["validation"]["server_config"];
@@ -177,6 +189,7 @@ function buildRequest(form: FormState): TranslateRequest {
       host: form.llm.host || null,
       // An emptied-then-blurred field becomes 0; treat 0 as "use the library default".
       num_ctx: form.llm.num_ctx || null,
+      repeat_penalty: form.llm.repeat_penalty || null,
       max_output_tokens: form.llm.max_output_tokens || null,
     },
     validation: { mode, max_iterations: max_iterations || 3, server_config },
@@ -202,11 +215,16 @@ export const useStore = create<Store>()(
         try {
           const [options, presets] = await Promise.all([api.getOptions(), api.getPresets()]);
           set({ options, presets });
-          // Seed the model from the library config for new/cleared users; leave a
-          // user's customized (non-empty) model untouched.
-          if (!get().form.llm.model) {
-            get().setLlm({ model: modelDefault(options, get().form.llm.provider) });
-          }
+          // Seed defaults from the library config for new/cleared users, leaving
+          // any customized (already-set) value untouched. Model is seeded for the
+          // current provider; the Ollama numeric knobs are seeded from the YAML so
+          // config/models/ollama.yaml stays the single source of truth.
+          const llm = get().form.llm;
+          const patch: Partial<LlmSettings> = {};
+          if (!llm.model) patch.model = modelDefault(options, llm.provider);
+          if (llm.repeat_penalty == null) patch.repeat_penalty = ollamaDefault(options, "repeat_penalty");
+          if (llm.num_ctx == null) patch.num_ctx = ollamaDefault(options, "num_ctx");
+          if (Object.keys(patch).length > 0) get().setLlm(patch);
         } catch (e) {
           console.error("Failed to load options/presets", e);
         }
@@ -326,6 +344,12 @@ export const useStore = create<Store>()(
                   st.chips = [...st.chips, { kind: "fix", iteration: ev.data.iteration }];
                   st.status = "validating";
                   break;
+                case "stalled":
+                  // The loop made no progress and is escalating with a fresh,
+                  // hotter retry. Keep showing activity (a fix is in flight).
+                  st.validationErrors = ev.data.errors;
+                  st.status = "fixing";
+                  break;
                 case "max_iterations":
                   st.validationErrors = ev.data.errors;
                   st.chips = [...st.chips, { kind: "max", iteration: ev.data.iteration }];
@@ -337,6 +361,7 @@ export const useStore = create<Store>()(
                   st.validationPassed = r.validation_passed;
                   st.durationSeconds = r.duration_seconds;
                   st.iterationsUsed = r.iterations_used;
+                  st.finalStatus = r.status;
                   st.tokenUsage = r.token_usage ?? null;
                   st.status = "done";
                   break;

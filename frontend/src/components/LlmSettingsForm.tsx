@@ -28,9 +28,20 @@ export function LlmSettingsForm() {
       </Field>
 
       {llm.provider === "ollama" ? (
-        <Field label="Context window (num_ctx)">
-          <NumberValueInput double min={256} value={llm.num_ctx} onChange={(v) => setLlm({ num_ctx: v })} />
-        </Field>
+        <>
+          <Field label="Context window (num_ctx)">
+            <NumberValueInput double min={256} value={llm.num_ctx} onChange={(v) => setLlm({ num_ctx: v })} />
+          </Field>
+          <Field label="Repeat penalty" hint="> 1.0 discourages the repeat loop on fix retries">
+            <Slider
+              value={llm.repeat_penalty ?? 1.1}
+              min={1}
+              max={2}
+              step={0.05}
+              onChange={(v) => setLlm({ repeat_penalty: v })}
+            />
+          </Field>
+        </>
       ) : (
         <Field label="Max output tokens">
           <NumberValueInput double min={1} value={llm.max_output_tokens} onChange={(v) => setLlm({ max_output_tokens: v })} />

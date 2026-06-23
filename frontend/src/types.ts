@@ -11,6 +11,7 @@ export interface LlmSettings {
   max_retries: number;
   num_ctx?: number | null; // ollama
   host?: string | null; // ollama (else OLLAMA_HOST on backend)
+  repeat_penalty?: number | null; // ollama (>1.0 curbs repeat loops)
   max_output_tokens?: number | null; // anthropic
 }
 
@@ -100,6 +101,7 @@ export type SseEvent =
   | { event: "generated"; data: { iteration: number; query: string } }
   | { event: "validated"; data: { iteration: number; query: string; errors: string[]; passed: boolean } }
   | { event: "fix"; data: { iteration: number; query: string } }
+  | { event: "stalled"; data: { iteration: number; query: string; errors: string[] } }
   | { event: "max_iterations"; data: { iteration: number; errors: string[] } }
   | { event: "completed"; data: { result: TranslationResult } }
   | { event: "error"; data: { message: string } };
