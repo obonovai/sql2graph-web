@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Toggle dark mode via a `.dark` class on <html> (not OS preference). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Let CodeMirror fill its container. */
+.cm-editor {
+  height: 100%;
+}
+.cm-editor .cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.caret-blink {
+  animation: blink 1s step-end infinite;
+}

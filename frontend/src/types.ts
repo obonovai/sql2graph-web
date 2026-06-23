@@ -1,0 +1,95 @@
+export type Provider = "ollama" | "anthropic";
+export type Target = "cypher" | "aql" | "gremlin";
+export type ValidationMode = "none" | "syntax" | "server";
+export type ServerType = "neo4j" | "arangodb" | "gremlin";
+export type Role = "system" | "user" | "assistant";
+
+export interface LlmSettings {
+  provider: Provider;
+  model: string;
+  temperature: number;
+  max_retries: number;
+  num_ctx?: number | null; // ollama
+  host?: string | null; // ollama (else OLLAMA_HOST on backend)
+  max_output_tokens?: number | null; // anthropic
+}
+
+export interface ServerSettings {
+  type: ServerType;
+  uri?: string | null;
+  database?: string | null;
+  notifications_min_severity?: "OFF" | "INFORMATION" | "WARNING" | null;
+  url?: string | null;
+  traversal_source?: string | null;
+  username?: string | null;
+  password?: string | null;
+}
+
+export interface ValidationSettings {
+  mode: ValidationMode;
+  max_iterations: number;
+  server_config?: ServerSettings | null;
+}
+
+export interface TranslateRequest {
+  target: Target;
+  mapping_yaml: string;
+  sql: string;
+  llm: LlmSettings;
+  validation: ValidationSettings;
+}
+
+export interface Message {
+  role: Role;
+  content: string;
+}
+
+export interface TranslationResult {
+  sql_query: string;
+  generated_query: string | null;
+  target_language: Target;
+  validation_passed: boolean;
+  validation_errors: string[];
+  iterations_used: number;
+  status: string;
+  duration_seconds: number;
+}
+
+export interface MappingValidity {
+  valid: boolean;
+  errors: string[];
+  node_count: number;
+  edge_count: number;
+}
+
+export interface Preset {
+  name: string;
+  mapping_yaml: string;
+  sample_sql: string;
+}
+
+export interface Options {
+  providers: Provider[];
+  targets: Target[];
+  validation_modes: ValidationMode[];
+  defaults: {
+    anthropic: Record<string, unknown>;
+    ollama: Record<string, unknown>;
+    max_iterations: number;
+  };
+  server_defaults: Record<ServerType, Record<string, unknown>>;
+  target_server_type: Record<Target, ServerType>;
+  notifications_min_severity_options: string[];
+  docker_available: boolean;
+}
+
+// SSE event payloads (discriminated by the SSE `event` name).
+export type SseEvent =
+  | { event: "status"; data: { phase: string } }
+  | { event: "conversation"; data: Message[] }
+  | { event: "generated"; data: { iteration: number; query: string } }
+  | { event: "validated"; data: { iteration: number; query: string; errors: string[]; passed: boolean } }
+  | { event: "fix"; data: { iteration: number; query: string } }
+  | { event: "max_iterations"; data: { iteration: number; errors: string[] } }
+  | { event: "completed"; data: { result: TranslationResult } }
+  | { event: "error"; data: { message: string } };
