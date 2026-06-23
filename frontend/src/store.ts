@@ -10,6 +10,7 @@ import type {
   Provider,
   ServerType,
   Target,
+  TokenUsage,
   TranslateRequest,
   ValidationMode,
 } from "./types";
@@ -52,6 +53,7 @@ interface StreamState {
   validationPassed: boolean | null;
   durationSeconds: number | null;
   iterationsUsed: number | null;
+  tokenUsage: TokenUsage | null;
   errorMessage: string | null;
   chips: IterationChip[];
 }
@@ -91,6 +93,7 @@ const INITIAL_STREAM: StreamState = {
   validationPassed: null,
   durationSeconds: null,
   iterationsUsed: null,
+  tokenUsage: null,
   errorMessage: null,
   chips: [],
 };
@@ -334,6 +337,7 @@ export const useStore = create<Store>()(
                   st.validationPassed = r.validation_passed;
                   st.durationSeconds = r.duration_seconds;
                   st.iterationsUsed = r.iterations_used;
+                  st.tokenUsage = r.token_usage ?? null;
                   st.status = "done";
                   break;
                 }

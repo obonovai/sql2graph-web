@@ -44,6 +44,14 @@ export interface Message {
   content: string;
 }
 
+export interface TokenUsage {
+  input_tokens: number; // uncached prompt tokens
+  output_tokens: number; // generated tokens
+  cache_read_tokens: number; // Anthropic prompt-cache hits (0 on Ollama)
+  cache_creation_tokens: number; // Anthropic cache writes (0 on Ollama)
+  total_tokens: number; // computed = sum of the four
+}
+
 export interface TranslationResult {
   sql_query: string;
   generated_query: string | null;
@@ -53,6 +61,8 @@ export interface TranslationResult {
   iterations_used: number;
   status: string;
   duration_seconds: number;
+  // Optional so the UI degrades gracefully if the editable library predates the feature.
+  token_usage?: TokenUsage;
 }
 
 export interface MappingValidity {
