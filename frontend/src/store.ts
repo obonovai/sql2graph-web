@@ -38,7 +38,7 @@ export interface ServerBag {
 export interface FormState {
   target: Target;
   llm: LlmSettings;
-  validation: { mode: ValidationMode; max_iterations: number; server: ServerBag };
+  validation: { mode: ValidationMode; max_iterations: number | null; server: ServerBag };
   mappingYaml: string;
   sql: string;
 }
@@ -56,11 +56,6 @@ interface StreamState {
   chips: IterationChip[];
 }
 
-const PROVIDER_MODEL_DEFAULTS: Record<Provider, string> = {
-  anthropic: "claude-opus-4-7",
-  ollama: "qwen2.5-coder:7b",
-};
-
 const EMPTY_SERVER: ServerBag = {
   uri: "",
   url: "",
@@ -75,7 +70,7 @@ const DEFAULT_FORM: FormState = {
   target: "cypher",
   llm: {
     provider: "anthropic",
-    model: PROVIDER_MODEL_DEFAULTS.anthropic,
+    model: "", // seeded from the library config via /api/options (see modelDefault)
     temperature: 0.1,
     max_retries: 3,
     num_ctx: 8192,
@@ -129,7 +124,7 @@ interface Store {
   setProvider: (p: Provider) => void;
   setLlm: (patch: Partial<LlmSettings>) => void;
   setValidationMode: (m: ValidationMode) => void;
-  setMaxIterations: (n: number) => void;
+  setMaxIterations: (n: number | null) => void;
   setServer: (patch: Partial<ServerBag>) => void;
   setMappingYaml: (s: string) => void;
   setSql: (s: string) => void;
@@ -142,6 +137,13 @@ interface Store {
   clearWorkspace: () => void;
   resetAll: () => void;
   canTranslate: () => boolean;
+}
+
+// The model default comes from the library's example config (via /api/options),
+// not a hardcoded value here.
+function modelDefault(options: Options | null, provider: Provider): string {
+  const m = options?.defaults?.[provider]?.model;
+  return typeof m === "string" ? m : "";
 }
 
 function buildRequest(form: FormState): TranslateRequest {
@@ -167,8 +169,14 @@ function buildRequest(form: FormState): TranslateRequest {
     target: form.target,
     mapping_yaml: form.mappingYaml,
     sql: form.sql,
-    llm: { ...form.llm, host: form.llm.host || null },
-    validation: { mode, max_iterations, server_config },
+    llm: {
+      ...form.llm,
+      host: form.llm.host || null,
+      // An emptied-then-blurred field becomes 0; treat 0 as "use the library default".
+      num_ctx: form.llm.num_ctx || null,
+      max_output_tokens: form.llm.max_output_tokens || null,
+    },
+    validation: { mode, max_iterations: max_iterations || 3, server_config },
   };
 }
 
@@ -191,6 +199,11 @@ export const useStore = create<Store>()(
         try {
           const [options, presets] = await Promise.all([api.getOptions(), api.getPresets()]);
           set({ options, presets });
+          // Seed the model from the library config for new/cleared users; leave a
+          // user's customized (non-empty) model untouched.
+          if (!get().form.llm.model) {
+            get().setLlm({ model: modelDefault(options, get().form.llm.provider) });
+          }
         } catch (e) {
           console.error("Failed to load options/presets", e);
         }
@@ -204,7 +217,7 @@ export const useStore = create<Store>()(
 
       setTarget: (t) => set((s) => ({ form: { ...s.form, target: t } })),
       setProvider: (p) =>
-        set((s) => ({ form: { ...s.form, llm: { ...s.form.llm, provider: p, model: PROVIDER_MODEL_DEFAULTS[p] } } })),
+        set((s) => ({ form: { ...s.form, llm: { ...s.form.llm, provider: p, model: modelDefault(s.options, p) } } })),
       setLlm: (patch) => set((s) => ({ form: { ...s.form, llm: { ...s.form.llm, ...patch } } })),
       setValidationMode: (m) => set((s) => ({ form: { ...s.form, validation: { ...s.form.validation, mode: m } } })),
       setMaxIterations: (n) =>
@@ -353,7 +366,16 @@ export const useStore = create<Store>()(
         set((s) => ({ form: { ...s.form, sql: "" }, stream: INITIAL_STREAM, features: [] })),
 
       resetAll: () =>
-        set({ form: { ...DEFAULT_FORM, validation: { ...DEFAULT_FORM.validation, server: { ...EMPTY_SERVER } } }, stream: INITIAL_STREAM, features: [], mappingValidity: null }),
+        set((s) => ({
+          form: {
+            ...DEFAULT_FORM,
+            llm: { ...DEFAULT_FORM.llm, model: modelDefault(s.options, DEFAULT_FORM.llm.provider) },
+            validation: { ...DEFAULT_FORM.validation, server: { ...EMPTY_SERVER } },
+          },
+          stream: INITIAL_STREAM,
+          features: [],
+          mappingValidity: null,
+        })),
     }),
     {
       name: "rows2graph-web",

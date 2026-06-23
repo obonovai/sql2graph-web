@@ -10,11 +10,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticUndefined
 from rows2graph import (
-    AnthropicConfig,
     ArangoDBConfig,
     GremlinConfig,
     Neo4jConfig,
-    OllamaConfig,
     SchemaMapping,
 )
 from rows2graph.sql_features import detect_features
@@ -57,14 +55,15 @@ def health() -> dict[str, str]:
 @router.get("/options")
 def options() -> dict[str, Any]:
     """Enums + library defaults for building the forms, kept in sync with the
-    library's own config models."""
+    library's own config models and example config files."""
+    model_defaults = presets.load_model_defaults()
     return {
         "providers": ["ollama", "anthropic"],
         "targets": ["cypher", "aql", "gremlin"],
         "validation_modes": ["none", "syntax", "server"],
         "defaults": {
-            "anthropic": _defaults(AnthropicConfig),
-            "ollama": _defaults(OllamaConfig),
+            "anthropic": model_defaults["anthropic"],
+            "ollama": model_defaults["ollama"],
             "max_iterations": 3,
         },
         "server_defaults": {

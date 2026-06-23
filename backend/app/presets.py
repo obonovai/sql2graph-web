@@ -1,15 +1,20 @@
-"""Bundled schema-mapping presets, read from the library's own config dir.
+"""Reads the library's own config dir so the UI's presets and defaults always
+match the library.
 
-We don't copy the YAML — we read ``rows2graph/config/mappings/{tpch,ldbc}.yaml``
-so presets always match the library. Each preset also ships a matching sample SQL
-query (drawn from the evaluation datasets) so Translate works in one click.
+- Schema-mapping presets come from ``rows2graph/config/mappings/{tpch,ldbc}.yaml``
+  (each paired with a sample SQL query so Translate works in one click).
+- Model defaults come from ``rows2graph/config/models/{ollama,anthropic}.yaml``
+  (loaded via the library's own ``load_model_config``), so editing those files is
+  the single source of truth for the sidebar's model field.
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
+
+from rows2graph import AnthropicConfig, OllamaConfig, load_model_config
 
 
 class Preset(TypedDict):
@@ -24,16 +29,16 @@ _SAMPLE_SQL: dict[str, str] = {
 }
 
 
-def _mappings_dir() -> Path:
+def _config_dir() -> Path:
     override = os.environ.get("ROWS2GRAPH_CONFIG_DIR")
     if override:
         return Path(override)
     # app/presets.py -> app -> backend -> rows2graph-web -> school/rows2graph
-    return Path(__file__).resolve().parents[3] / "rows2graph" / "config" / "mappings"
+    return Path(__file__).resolve().parents[3] / "rows2graph" / "config"
 
 
 def load_presets() -> list[Preset]:
-    base = _mappings_dir()
+    base = _config_dir() / "mappings"
     presets: list[Preset] = []
     for name in ("tpch", "ldbc"):
         path = base / f"{name}.yaml"
@@ -42,3 +47,19 @@ def load_presets() -> list[Preset]:
                 Preset(name=name, mapping_yaml=path.read_text(), sample_sql=_SAMPLE_SQL.get(name, ""))
             )
     return presets
+
+
+def load_model_defaults() -> dict[str, dict[str, Any]]:
+    """Default model settings per provider, sourced from the library's example
+    model configs. Falls back to the library's own class defaults if a file is
+    missing or fails to load (e.g. an unset interpolated env var)."""
+    models_dir = _config_dir() / "models"
+    defaults: dict[str, dict[str, Any]] = {}
+    for name, cls in (("ollama", OllamaConfig), ("anthropic", AnthropicConfig)):
+        path = models_dir / f"{name}.yaml"
+        try:
+            cfg = load_model_config(path) if path.is_file() else cls()
+        except Exception:  # noqa: BLE001 - any load/validation issue -> safe class defaults
+            cfg = cls()
+        defaults[name] = cfg.model_dump()
+    return defaults

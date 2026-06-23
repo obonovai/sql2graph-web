@@ -75,8 +75,8 @@ When `frontend/dist/` exists the backend serves the SPA from `/` (same origin, n
 
 - `OLLAMA_HOST` — default Ollama endpoint when the sidebar host override is blank.
 - `ANTHROPIC_API_KEY` — read by the Anthropic SDK on the backend.
-- `ROWS2GRAPH_CONFIG_DIR` — override where preset mappings are read from (defaults to
-  `../rows2graph/config/mappings`).
+- `ROWS2GRAPH_CONFIG_DIR` — override the library `config/` dir used for preset mappings
+  (`mappings/`) and the model-field defaults (`models/`); defaults to `../rows2graph/config`.
 
 ## API
 

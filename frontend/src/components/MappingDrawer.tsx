@@ -29,17 +29,12 @@ export function MappingDrawer() {
         <Select
           className="!w-auto"
           value=""
-          onChange={(e) => {
-            if (e.target.value) applyPreset(e.target.value);
+          placeholder="Load…"
+          onChange={(v) => {
+            if (v) applyPreset(v);
           }}
-        >
-          <option value="">Load…</option>
-          {presets.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </Select>
+          options={presets.map((p) => ({ value: p.name, label: p.name }))}
+        />
 
         <Button variant="default" onClick={() => fileRef.current?.click()}>
           Upload .yaml

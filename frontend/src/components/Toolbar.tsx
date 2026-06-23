@@ -19,11 +19,16 @@ export function Toolbar() {
     <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
       <div className="flex items-center gap-1.5">
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Target</span>
-        <Select value={target} onChange={(e) => setTarget(e.target.value as never)} className="!w-auto">
-          <option value="cypher">Cypher</option>
-          <option value="aql">AQL</option>
-          <option value="gremlin">Gremlin</option>
-        </Select>
+        <Select
+          value={target}
+          onChange={(v) => setTarget(v as never)}
+          className="!w-auto"
+          options={[
+            { value: "cypher", label: "Cypher" },
+            { value: "aql", label: "AQL" },
+            { value: "gremlin", label: "Gremlin" },
+          ]}
+        />
       </div>
 
       <button

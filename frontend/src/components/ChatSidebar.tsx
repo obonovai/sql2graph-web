@@ -1,94 +1,80 @@
 import { useEffect, useRef, useState } from "react";
+import { Bot, ChevronDown, ChevronUp, Cog, User } from "lucide-react";
 import { useStore } from "../store";
-import type { IterationChip } from "../store";
 import type { Message } from "../types";
-import { Chip } from "./primitives";
+import { cls } from "./primitives";
 
 const RUNNING = new Set(["generating", "validating", "fixing", "provisioning"]);
 
-function ChipRibbon({ chips }: { chips: IterationChip[] }) {
-  if (chips.length === 0) return null;
+function SystemBubble({ content }: { content: string }) {
+  const [open, setOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const Chevron = open ? ChevronUp : ChevronDown;
   return (
-    <div className="flex flex-wrap gap-1 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-      {chips.map((c, i) => {
-        if (c.kind === "validated")
-          return c.passed ? (
-            <Chip key={i} tone="green">
-              iter {c.iteration} ✓
-            </Chip>
-          ) : (
-            <Chip key={i} tone="red">
-              iter {c.iteration} ✗ {c.errorCount}
-            </Chip>
-          );
-        if (c.kind === "fix")
-          return (
-            <Chip key={i} tone="indigo">
-              fix → iter {c.iteration + 1}
-            </Chip>
-          );
-        return (
-          <Chip key={i} tone="amber">
-            max iters @ {c.iteration}
-          </Chip>
-        );
-      })}
+    <div className="flex justify-center">
+      <div className="flex max-w-[85%] flex-col items-center">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+        >
+          <Cog className="h-3.5 w-3.5" />
+          <span>System</span>
+          <Chevron className="h-3.5 w-3.5" />
+        </button>
+        <div
+          className="w-full overflow-hidden transition-[max-height] duration-700 ease-in-out"
+          style={{ maxHeight: open ? (contentRef.current?.scrollHeight ?? 0) : 0 }}
+        >
+          <div ref={contentRef}>
+            <pre className="mt-1 whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] leading-snug text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              {content}
+            </pre>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function SystemBubble({ content }: { content: string }) {
-  const [open, setOpen] = useState(false);
+function ChatBubble({ msg, streaming }: { msg: Message; streaming: boolean }) {
+  const isUser = msg.role === "user";
+  const Icon = isUser ? User : Bot;
   return (
-    <div className="rounded-md bg-slate-100 px-2.5 py-1.5 dark:bg-slate-800/60">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"
-      >
-        <span>{open ? "▾" : "▸"}</span> system
-        <span className="font-normal normal-case text-slate-400">({content.length} chars — schema + rules)</span>
-      </button>
-      {open && (
-        <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-          {content}
+    <div className={cls("flex", isUser ? "justify-end" : "justify-start")}>
+      <div className={cls("flex max-w-[85%] flex-col", isUser ? "items-end" : "items-start")}>
+        <div
+          className={cls(
+            "mb-0.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide",
+            isUser ? "text-sky-600 dark:text-sky-400" : "text-emerald-600 dark:text-emerald-400",
+          )}
+        >
+          <Icon className="h-3.5 w-3.5" />
+          <span>{isUser ? "User" : "Assistant"}</span>
+        </div>
+        <pre
+          className={cls(
+            "whitespace-pre-wrap break-words rounded-lg border px-2.5 py-1.5 text-[12px] leading-snug",
+            isUser
+              ? "border-sky-200 bg-sky-50 text-slate-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-slate-200"
+              : "border-emerald-200 bg-emerald-50 text-slate-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-slate-100",
+          )}
+        >
+          {msg.content}
+          {streaming && <span className="caret-blink">▋</span>}
         </pre>
-      )}
+      </div>
     </div>
   );
 }
 
 function Bubble({ msg, streaming }: { msg: Message; streaming: boolean }) {
   if (msg.role === "system") return <SystemBubble content={msg.content} />;
-  const isUser = msg.role === "user";
-  return (
-    <div>
-      <div
-        className={
-          "mb-0.5 text-[11px] font-semibold uppercase tracking-wide " +
-          (isUser ? "text-sky-600 dark:text-sky-400" : "text-emerald-600 dark:text-emerald-400")
-        }
-      >
-        {msg.role}
-      </div>
-      <pre
-        className={
-          "whitespace-pre-wrap break-words rounded-md px-2.5 py-1.5 text-[12px] leading-snug " +
-          (isUser
-            ? "bg-sky-50 text-slate-700 dark:bg-sky-950/30 dark:text-slate-200"
-            : "bg-emerald-50 text-slate-800 dark:bg-emerald-950/20 dark:text-slate-100")
-        }
-      >
-        {msg.content}
-        {streaming && <span className="caret-blink">▋</span>}
-      </pre>
-    </div>
-  );
+  return <ChatBubble msg={msg} streaming={streaming} />;
 }
 
 export function ChatSidebar() {
   const conversation = useStore((s) => s.stream.conversation);
   const status = useStore((s) => s.stream.status);
-  const chips = useStore((s) => s.stream.chips);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [stick, setStick] = useState(true);
   const running = RUNNING.has(status);
@@ -100,7 +86,6 @@ export function ChatSidebar() {
 
   return (
     <div className="flex h-full flex-col">
-      <ChipRibbon chips={chips} />
       <div
         ref={scrollRef}
         onScroll={(e) => {

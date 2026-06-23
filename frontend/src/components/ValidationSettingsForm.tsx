@@ -1,5 +1,5 @@
 import { SERVER_TYPE_BY_TARGET, useStore } from "../store";
-import { Field, NumberInput, Select, TextInput } from "./primitives";
+import { Field, NumberValueInput, Select, TextInput } from "./primitives";
 
 export function ValidationSettingsForm() {
   const target = useStore((s) => s.form.target);
@@ -16,28 +16,19 @@ export function ValidationSettingsForm() {
   return (
     <div className="space-y-3">
       <Field label="Validation mode">
-        <Select value={validation.mode} onChange={(e) => setValidationMode(e.target.value as never)}>
-          <option value="none">none — single shot, no checks</option>
-          <option value="syntax">syntax — regex sanity checks</option>
-          <option value="server">server — validate against a graph DB</option>
-        </Select>
-      </Field>
-
-      <Field label="Max retries (fix iterations)" hint="generate → validate → fix loop limit">
-        <NumberInput
-          min={1}
-          value={validation.max_iterations}
-          onChange={(e) => setMaxIterations(Number(e.target.value))}
+        <Select
+          value={validation.mode}
+          onChange={(v) => setValidationMode(v as never)}
+          options={[
+            { value: "none", label: "none" },
+            { value: "syntax", label: "syntax" },
+            { value: "server", label: "server" },
+          ]}
         />
       </Field>
 
       {validation.mode === "server" && (
         <div className="space-y-3 rounded-md border border-slate-200 p-2.5 dark:border-slate-700">
-          <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-            Target <b>{target}</b> needs a <b>{serverType}</b> connection. The DB is reached from the{" "}
-            <b>backend</b> — "localhost" means the server's localhost.
-          </p>
-
           {serverType === "neo4j" && (
             <>
               <Field label="URI">
@@ -54,14 +45,19 @@ export function ValidationSettingsForm() {
               </Field>
               <Field label="Notifications min severity">
                 <Select
-                  value={s.notifications_min_severity}
-                  onChange={(e) => setServer({ notifications_min_severity: e.target.value as never })}
-                >
-                  <option value="">(driver default)</option>
-                  <option value="OFF">OFF</option>
-                  <option value="INFORMATION">INFORMATION</option>
-                  <option value="WARNING">WARNING</option>
-                </Select>
+                  value={s.notifications_min_severity || "default"}
+                  onChange={(v) =>
+                    setServer({
+                      notifications_min_severity: v === "default" ? "" : (v as "OFF" | "INFORMATION" | "WARNING"),
+                    })
+                  }
+                  options={[
+                    { value: "default", label: "(driver default)" },
+                    { value: "OFF", label: "OFF" },
+                    { value: "INFORMATION", label: "INFORMATION" },
+                    { value: "WARNING", label: "WARNING" },
+                  ]}
+                />
               </Field>
             </>
           )}
@@ -105,7 +101,7 @@ export function ValidationSettingsForm() {
               className={
                 "rounded-md px-2 py-1.5 text-[11px] " +
                 (dockerAvailable
-                  ? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                  ? "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
                   : "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300")
               }
             >
@@ -116,6 +112,10 @@ export function ValidationSettingsForm() {
           )}
         </div>
       )}
+
+      <Field label="Max retries">
+        <NumberValueInput min={1} value={validation.max_iterations} onChange={(v) => setMaxIterations(v)} />
+      </Field>
     </div>
   );
 }

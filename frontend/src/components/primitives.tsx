@@ -1,5 +1,7 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { useState } from "react";
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import * as RSelect from "@radix-ui/react-select";
 
 export function cls(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -59,7 +61,7 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 }
 
 const inputCls =
-  "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
+  "h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm text-slate-800 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={inputCls} {...props} />;
@@ -69,14 +71,135 @@ export function NumberInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input type="number" className={inputCls} {...props} />;
 }
 
-export function Select({
-  children,
+// Number field with a [ field ] [−|+] stepper (the native spinner is hidden).
+// The field may be cleared while editing (emits null); on blur an empty field
+// autofills 0 so it is never left blank. With `double`, the buttons double/halve
+// the value (1024 → 2048 → 4096 …) instead of stepping by `step`.
+export function NumberValueInput({
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  double = false,
   ...props
-}: { children: ReactNode } & SelectHTMLAttributes<HTMLSelectElement>) {
+}: {
+  value: number | null | undefined;
+  onChange: (v: number | null) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  double?: boolean;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "min" | "max" | "step">) {
+  const current = value ?? 0;
+  const clamp = (n: number) => (min != null && n < min ? min : max != null && n > max ? max : n);
+  const bump = (dir: 1 | -1) => {
+    const next = double
+      ? dir === 1
+        ? current > 0
+          ? current * 2
+          : (min ?? 1)
+        : Math.floor(current / 2)
+      : current + dir * step;
+    onChange(clamp(next));
+  };
+  const stepBtn =
+    "flex w-8 items-center justify-center bg-white text-lg leading-none text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
   return (
-    <select className={cls(inputCls, "cursor-pointer")} {...props}>
-      {children}
-    </select>
+    <div className="flex items-center gap-1.5">
+      <div className="min-w-0 flex-1">
+        <input
+          type="number"
+          className={cls(inputCls, "no-spinner")}
+          {...props}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+          onBlur={(e) => {
+            if (e.target.value === "") onChange(0);
+          }}
+        />
+      </div>
+      <div className="flex h-9 shrink-0 overflow-hidden rounded-md border border-slate-300 dark:border-slate-600">
+        <button
+          type="button"
+          aria-label="Decrease"
+          className={cls(stepBtn, "border-r border-slate-300 dark:border-slate-600")}
+          disabled={min != null && current <= min}
+          onClick={() => bump(-1)}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          aria-label="Increase"
+          className={stepBtn}
+          disabled={max != null && current >= max}
+          onClick={() => bump(1)}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+// Radix-based select so the option list always drops down *below* the trigger
+// (rendered in a portal, so the sidebar's scroll never clips it). Option values
+// must be non-empty (a Radix constraint) — use a sentinel for an "empty" choice.
+export function Select({
+  value,
+  onChange,
+  options,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <RSelect.Root value={value} onValueChange={onChange}>
+      <RSelect.Trigger
+        aria-label={placeholder}
+        className={cls(inputCls, "flex cursor-pointer items-center justify-between gap-2", className)}
+      >
+        <RSelect.Value placeholder={placeholder} />
+        <RSelect.Icon>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </RSelect.Icon>
+      </RSelect.Trigger>
+      <RSelect.Portal>
+        <RSelect.Content
+          position="popper"
+          side="bottom"
+          sideOffset={4}
+          avoidCollisions={false}
+          className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-600 dark:bg-slate-800"
+        >
+          <RSelect.Viewport>
+            {options.map((o) => (
+              <RSelect.Item
+                key={o.value}
+                value={o.value}
+                className="relative flex cursor-pointer select-none items-center rounded px-2 py-1.5 pr-7 text-sm text-slate-700 outline-none data-[highlighted]:bg-indigo-100 data-[highlighted]:text-indigo-900 dark:text-slate-200 dark:data-[highlighted]:bg-indigo-900/40 dark:data-[highlighted]:text-indigo-100"
+              >
+                <RSelect.ItemText>{o.label}</RSelect.ItemText>
+                <RSelect.ItemIndicator className="absolute right-2">
+                  <Check className="h-3.5 w-3.5" />
+                </RSelect.ItemIndicator>
+              </RSelect.Item>
+            ))}
+          </RSelect.Viewport>
+        </RSelect.Content>
+      </RSelect.Portal>
+    </RSelect.Root>
   );
 }
 
@@ -144,7 +267,11 @@ export function Section({ title, children, defaultOpen = true }: { title: string
         className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
       >
         {title}
-        <span className="text-slate-400">{open ? "−" : "+"}</span>
+        {open ? (
+          <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+        )}
       </button>
       {open && <div className="space-y-3 px-3 pb-4">{children}</div>}
     </div>
