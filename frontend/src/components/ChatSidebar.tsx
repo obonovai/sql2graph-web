@@ -12,7 +12,7 @@ function SystemBubble({ content }: { content: string }) {
   const Chevron = open ? ChevronUp : ChevronDown;
   return (
     <div className="flex justify-center">
-      <div className="flex max-w-[85%] flex-col items-center">
+      <div className="flex min-w-0 max-w-[85%] flex-col items-center">
         <button
           onClick={() => setOpen(!open)}
           className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
@@ -25,8 +25,8 @@ function SystemBubble({ content }: { content: string }) {
           className="w-full overflow-hidden transition-[max-height] duration-700 ease-in-out"
           style={{ maxHeight: open ? (contentRef.current?.scrollHeight ?? 0) : 0 }}
         >
-          <div ref={contentRef}>
-            <pre className="mt-1 whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] leading-snug text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          <div ref={contentRef} className="pt-1">
+            <pre className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] leading-snug text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
               {content}
             </pre>
           </div>
@@ -41,7 +41,7 @@ function ChatBubble({ msg, streaming }: { msg: Message; streaming: boolean }) {
   const Icon = isUser ? User : Bot;
   return (
     <div className={cls("flex", isUser ? "justify-end" : "justify-start")}>
-      <div className={cls("flex max-w-[85%] flex-col", isUser ? "items-end" : "items-start")}>
+      <div className={cls("flex min-w-0 max-w-[85%] flex-col", isUser ? "items-end" : "items-start")}>
         <div
           className={cls(
             "mb-0.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide",
@@ -53,7 +53,7 @@ function ChatBubble({ msg, streaming }: { msg: Message; streaming: boolean }) {
         </div>
         <pre
           className={cls(
-            "whitespace-pre-wrap break-words rounded-lg border px-2.5 py-1.5 text-[12px] leading-snug",
+            "whitespace-pre-wrap [overflow-wrap:anywhere] rounded-lg border px-2.5 py-1.5 text-[12px] leading-snug",
             isUser
               ? "border-sky-200 bg-sky-50 text-slate-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-slate-200"
               : "border-emerald-200 bg-emerald-50 text-slate-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-slate-100",
