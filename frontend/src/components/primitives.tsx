@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { useState } from "react";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, X } from "lucide-react";
 import * as RSelect from "@radix-ui/react-select";
 
 export function cls(...parts: (string | false | null | undefined)[]): string {
@@ -305,5 +305,42 @@ export function Spinner({ className }: { className?: string }) {
         className,
       )}
     />
+  );
+}
+
+// The shared h-9 footer bar at the bottom of every workbench pane — single source
+// of truth so the mapping / SQL / result footers can't drift apart again.
+export function FooterBar({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-9 shrink-0 items-center gap-2 overflow-x-auto border-t border-slate-200 px-3 text-xs dark:border-slate-700 [&>*]:shrink-0">
+      {children}
+    </div>
+  );
+}
+
+// One status vocabulary for the footers: a lucide icon (or spinner) + colored
+// text. `success`→Check/emerald, `error`→X/rose, `warn`→AlertTriangle/amber,
+// `running`→Spinner/slate, `muted`→no icon/slate.
+type StatusTone = "success" | "error" | "warn" | "muted" | "running";
+
+export function StatusText({ tone, children }: { tone: StatusTone; children: ReactNode }) {
+  const color =
+    tone === "success"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "error"
+        ? "text-rose-600 dark:text-rose-400"
+        : tone === "warn"
+          ? "text-amber-600 dark:text-amber-400"
+          : tone === "running"
+            ? "text-slate-500 dark:text-slate-400"
+            : "text-slate-400";
+  return (
+    <span className={cls("inline-flex items-center gap-1.5 text-xs font-medium", color)}>
+      {tone === "success" && <Check className="h-3.5 w-3.5" />}
+      {tone === "error" && <X className="h-3.5 w-3.5" />}
+      {tone === "warn" && <AlertTriangle className="h-3.5 w-3.5" />}
+      {tone === "running" && <Spinner />}
+      {children}
+    </span>
   );
 }

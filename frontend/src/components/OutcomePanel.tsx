@@ -1,21 +1,16 @@
-import type { ReactNode } from "react";
 import { Copy, Download } from "lucide-react";
 import { RUNNING_STATUSES, useStore } from "../store";
 import { CodeEditor } from "./CodeEditor";
-import { Chip, IconButton, PaneHeader, Spinner } from "./primitives";
+import { Chip, FooterBar, IconButton, PaneHeader, StatusText } from "./primitives";
 
 const FILE_EXT: Record<string, string> = { cypher: "cypher", aql: "aql", gremlin: "groovy" };
 
-const PHASE_LABEL: Record<string, string> = {
-  provisioning: "Provisioning…",
-  generating: "Generating…",
-  validating: "Validating…",
-  fixing: "Fixing…",
-};
-
-// Verdict-first view of the translation outcome: status badge + cost metrics +
-// the generated query (copy / download) + structured validation errors. Absorbs
-// the done/error semantics that used to live in the one-line StatusStrip.
+// Result pane:
+//  · header — the target language (left) + copy / download (right)
+//  · body   — the generated query (read-only) or a placeholder
+//  · footer — the live process status (db setup, LLM calls, validation) that
+//             resolves, at the end, into the outcome badges (verdict + iterations
+//             + duration + tokens).
 export function OutcomePanel() {
   const target = useStore((s) => s.form.target);
   const theme = useStore((s) => s.theme);
@@ -29,6 +24,7 @@ export function OutcomePanel() {
   const duration = useStore((s) => s.stream.durationSeconds);
   const tokens = useStore((s) => s.stream.tokenUsage);
   const errorMessage = useStore((s) => s.stream.errorMessage);
+  const stalled = useStore((s) => s.stream.stalled);
 
   const copy = () => generated && navigator.clipboard?.writeText(generated);
   const download = () => {
@@ -41,26 +37,7 @@ export function OutcomePanel() {
     URL.revokeObjectURL(url);
   };
 
-  let verdict: ReactNode = "Result";
-  if (RUNNING_STATUSES.has(status)) {
-    verdict = (
-      <span className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-300">
-        <Spinner /> {PHASE_LABEL[status] ?? "Working…"}
-      </span>
-    );
-  } else if (status === "error") {
-    verdict = <Chip tone="red" size="md">Error</Chip>;
-  } else if (status === "done") {
-    verdict =
-      passed !== false ? (
-        <Chip tone="green" size="md">✓ success</Chip>
-      ) : (
-        <Chip tone={finalStatus === "stalled" ? "amber" : "red"} size="md">
-          ✗ {finalStatus ?? "max_iterations_reached"}
-        </Chip>
-      );
-  }
-
+  const iters = iterationsUsed ?? currentIteration;
   const tokenTitle = tokens
     ? `${tokens.input_tokens.toLocaleString()} in · ${tokens.output_tokens.toLocaleString()} out` +
       (tokens.cache_read_tokens > 0 || tokens.cache_creation_tokens > 0
@@ -68,38 +45,33 @@ export function OutcomePanel() {
         : "")
     : undefined;
 
+  const runningLabel =
+    status === "provisioning"
+      ? "Setting up database… (first run can take 10–40s)"
+      : status === "generating"
+        ? "Generating query…"
+        : status === "validating"
+          ? `Validating (iteration ${currentIteration})…`
+          : stalled
+            ? "Escalating (hotter retry)…"
+            : "Fixing…";
+
   return (
     <div className="flex h-full flex-col">
-      <PaneHeader title={verdict}>
-        <IconButton onClick={copy} disabled={!generated} title="Copy">
-          <Copy className="h-4 w-4" />
-        </IconButton>
-        <IconButton onClick={download} disabled={!generated} title="Download">
-          <Download className="h-4 w-4" />
-        </IconButton>
-      </PaneHeader>
-
-      {status === "done" && (
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
-          <Chip>{iterationsUsed ?? currentIteration} iteration(s)</Chip>
-          <Chip>{(duration ?? 0).toFixed(2)}s</Chip>
-          {tokens && tokens.total_tokens > 0 && (
-            <Chip title={tokenTitle}>{tokens.total_tokens.toLocaleString()} tokens</Chip>
-          )}
+      <PaneHeader title={target}>
+        <div className="flex items-center gap-1">
+          <IconButton onClick={copy} disabled={!generated} title="Copy">
+            <Copy className="h-4 w-4" />
+          </IconButton>
+          <IconButton onClick={download} disabled={!generated} title="Download">
+            <Download className="h-4 w-4" />
+          </IconButton>
         </div>
-      )}
+      </PaneHeader>
 
       <div className="min-h-0 flex-1">
         {generated ? (
           <CodeEditor value={generated} language="sql" readOnly theme={theme} />
-        ) : status === "error" ? (
-          <div className="flex h-full items-start justify-center overflow-y-auto px-4 py-6 text-center text-sm text-rose-600 dark:text-rose-400">
-            {errorMessage ?? "Translation failed."}
-          </div>
-        ) : RUNNING_STATUSES.has(status) ? (
-          <div className="flex h-full items-center justify-center gap-2 text-sm text-slate-400">
-            <Spinner /> Working…
-          </div>
         ) : (
           <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-400">
             The translated query will appear here.
@@ -117,6 +89,32 @@ export function OutcomePanel() {
           </ul>
         </div>
       )}
+
+      {/* Process status → end-of-run outcome. Shared FooterBar + StatusText. */}
+      <FooterBar>
+        {status === "idle" && <StatusText tone="muted">Ready.</StatusText>}
+
+        {RUNNING_STATUSES.has(status) && <StatusText tone="running">{runningLabel}</StatusText>}
+
+        {status === "error" && <StatusText tone="error">Error: {errorMessage ?? "translation failed"}</StatusText>}
+
+        {status === "done" && (
+          <>
+            {passed !== false ? (
+              <StatusText tone="success">success</StatusText>
+            ) : (
+              <StatusText tone={finalStatus === "stalled" ? "warn" : "error"}>
+                {finalStatus ?? "max_iterations_reached"}
+              </StatusText>
+            )}
+            <Chip>
+              {iters} iteration{iters === 1 ? "" : "s"}
+            </Chip>
+            <Chip>{(duration ?? 0).toFixed(2)}s</Chip>
+            {tokens && tokens.total_tokens > 0 && <Chip title={tokenTitle}>{tokens.total_tokens.toLocaleString()} tokens</Chip>}
+          </>
+        )}
+      </FooterBar>
     </div>
   );
 }

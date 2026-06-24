@@ -32,7 +32,7 @@ export function LlmSettingsForm() {
           <Field label="Context window (num_ctx)">
             <NumberValueInput double min={256} value={llm.num_ctx} onChange={(v) => setLlm({ num_ctx: v })} />
           </Field>
-          <Field label="Repeat penalty" hint="> 1.0 discourages the repeat loop on fix retries">
+          <Field label="Repeat penalty">
             <Slider
               value={llm.repeat_penalty ?? 1.1}
               min={1}

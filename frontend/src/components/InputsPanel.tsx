@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { useRef } from "react";
+import { Upload } from "lucide-react";
 import { useStore } from "../store";
 import { CodeEditor } from "./CodeEditor";
 import { FeatureChips } from "./FeatureChips";
-import { Button, Select, cls } from "./primitives";
+import { FooterBar, IconButton, StatusText, cls } from "./primitives";
 
 const MAPPING_PLACEHOLDER =
   "nodes:\n  - label: Person\n    source_table: person\n    properties:\n      name: first_name\n    primary_key: id\nedges: []";
@@ -36,13 +37,13 @@ export function InputsPanel() {
   const setMappingYaml = useStore((s) => s.setMappingYaml);
   const sql = useStore((s) => s.form.sql);
   const setSql = useStore((s) => s.setSql);
-  const presets = useStore((s) => s.presets);
-  const applyPreset = useStore((s) => s.applyPreset);
   const validity = useStore((s) => s.mappingValidity);
   const theme = useStore((s) => s.theme);
   const refreshValidity = useStore((s) => s.refreshMappingValidity);
+  const refreshFeatures = useStore((s) => s.refreshFeatures);
   const translate = useStore((s) => s.translate);
   const fileRef = useRef<HTMLInputElement>(null);
+  const sqlFileRef = useRef<HTMLInputElement>(null);
 
   const dot = validity == null ? "bg-slate-300" : validity.valid ? "bg-emerald-500" : "bg-rose-500";
 
@@ -51,6 +52,15 @@ export function InputsPanel() {
     reader.onload = () => {
       setMappingYaml(String(reader.result ?? ""));
       void refreshValidity();
+    };
+    reader.readAsText(file);
+  };
+
+  const onUploadSql = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSql(String(reader.result ?? ""));
+      void refreshFeatures();
     };
     reader.readAsText(file);
   };
@@ -65,59 +75,18 @@ export function InputsPanel() {
         <Tab active={tab === "sql"} onClick={() => setTab("sql")}>
           SQL
         </Tab>
-      </div>
-
-      {/* Onboarding front-door: only on a fresh, empty workspace. */}
-      {!mappingYaml.trim() && !sql.trim() && presets.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-300">
-          <span>New here? Load a preset to fill the mapping + a sample query:</span>
-          {presets.map((p) => (
-            <Button key={p.name} variant="default" onClick={() => applyPreset(p.name)}>
-              {p.name}
-            </Button>
-          ))}
+        <div className="ml-auto flex items-center pr-2">
+          <IconButton
+            onClick={() => (tab === "mapping" ? fileRef : sqlFileRef).current?.click()}
+            title={tab === "mapping" ? "Upload .yaml" : "Upload .sql"}
+          >
+            <Upload className="h-4 w-4" />
+          </IconButton>
         </div>
-      )}
+      </div>
 
       {/* Schema-mapping tab */}
       <div className={cls("flex min-h-0 flex-1 flex-col", tab !== "mapping" && "hidden")}>
-        <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Presets</span>
-          <Select
-            className="!w-auto"
-            value=""
-            placeholder="Load…"
-            onChange={(v) => {
-              if (v) applyPreset(v);
-            }}
-            options={presets.map((p) => ({ value: p.name, label: p.name }))}
-          />
-          <Button variant="default" onClick={() => fileRef.current?.click()}>
-            Upload .yaml
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".yaml,.yml,text/yaml"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onUpload(f);
-              e.target.value = "";
-            }}
-          />
-          <div className="ml-auto text-xs">
-            {validity == null ? (
-              <span className="text-slate-400">no mapping</span>
-            ) : validity.valid ? (
-              <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                ✓ {validity.node_count} nodes · {validity.edge_count} edges
-              </span>
-            ) : (
-              <span className="font-medium text-rose-600 dark:text-rose-400">✗ {validity.errors.length} error(s)</span>
-            )}
-          </div>
-        </div>
         <div className="min-h-0 flex-1">
           <CodeEditor
             value={mappingYaml}
@@ -127,6 +96,17 @@ export function InputsPanel() {
             placeholder={MAPPING_PLACEHOLDER}
           />
         </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".yaml,.yml,text/yaml"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onUpload(f);
+            e.target.value = "";
+          }}
+        />
         {validity && !validity.valid && validity.errors.length > 0 && (
           <ul className="max-h-24 shrink-0 overflow-y-auto border-t border-rose-100 bg-rose-50 px-3 py-1.5 text-[11px] text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
             {validity.errors.map((e, i) => (
@@ -134,6 +114,21 @@ export function InputsPanel() {
             ))}
           </ul>
         )}
+        {/* Validity footer — shared FooterBar + StatusText. */}
+        <FooterBar>
+          {validity == null ? (
+            <StatusText tone="muted">No mapping yet.</StatusText>
+          ) : validity.valid ? (
+            <StatusText tone="success">
+              {validity.node_count} node{validity.node_count === 1 ? "" : "s"} · {validity.edge_count} edge
+              {validity.edge_count === 1 ? "" : "s"}
+            </StatusText>
+          ) : (
+            <StatusText tone="error">
+              {validity.errors.length} error{validity.errors.length === 1 ? "" : "s"}
+            </StatusText>
+          )}
+        </FooterBar>
       </div>
 
       {/* SQL tab */}
@@ -148,6 +143,17 @@ export function InputsPanel() {
             placeholder="SELECT name FROM supplier WHERE suppkey = 1337"
           />
         </div>
+        <input
+          ref={sqlFileRef}
+          type="file"
+          accept=".sql,text/plain"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onUploadSql(f);
+            e.target.value = "";
+          }}
+        />
         <FeatureChips />
       </div>
     </div>

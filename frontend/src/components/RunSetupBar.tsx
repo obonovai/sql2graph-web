@@ -1,18 +1,12 @@
 import { Play, Square } from "lucide-react";
 import { RUNNING_STATUSES, useStore } from "../store";
-import { Button, NumberValueInput, Select } from "./primitives";
+import { Button, Select } from "./primitives";
 
-// The "what will happen when I hit Translate" plan in one row: target language,
-// validation mode, and iteration budget — gathered out of the toolbar/sidebar —
-// alongside the primary Translate / Stop / Clear actions and an inline reason
-// when Translate is unavailable.
+// The primary run controls: pick the target language and translate. Validation
+// mode + iteration budget live in the Settings sidebar (one home, no duplicate).
 export function RunSetupBar() {
   const target = useStore((s) => s.form.target);
   const setTarget = useStore((s) => s.setTarget);
-  const mode = useStore((s) => s.form.validation.mode);
-  const setValidationMode = useStore((s) => s.setValidationMode);
-  const maxIterations = useStore((s) => s.form.validation.max_iterations);
-  const setMaxIterations = useStore((s) => s.setMaxIterations);
   const sql = useStore((s) => s.form.sql);
   const validity = useStore((s) => s.mappingValidity);
   const status = useStore((s) => s.stream.status);
@@ -42,27 +36,6 @@ export function RunSetupBar() {
             { value: "gremlin", label: "Gremlin" },
           ]}
         />
-      </div>
-
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Validation</span>
-        <Select
-          value={mode}
-          onChange={(v) => setValidationMode(v as never)}
-          className="!w-auto"
-          options={[
-            { value: "none", label: "none" },
-            { value: "syntax", label: "syntax" },
-            { value: "server", label: "server" },
-          ]}
-        />
-      </div>
-
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Max iterations</span>
-        <div className="w-32">
-          <NumberValueInput min={1} value={maxIterations} onChange={setMaxIterations} />
-        </div>
       </div>
 
       <div className="ml-auto flex items-center gap-2">

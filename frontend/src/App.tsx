@@ -9,7 +9,6 @@ import { RunSetupBar } from "./components/RunSetupBar";
 import { InputsPanel } from "./components/InputsPanel";
 import { OutcomePanel } from "./components/OutcomePanel";
 import { ChatSidebar } from "./components/ChatSidebar";
-import { IterationTimeline } from "./components/IterationTimeline";
 import { Section } from "./components/primitives";
 
 function CollapsedChatRail() {
@@ -79,7 +78,6 @@ export default function App() {
               </Panel>
             </PanelGroup>
           </div>
-          <IterationTimeline />
         </section>
 
         <CollapsibleSidebar
