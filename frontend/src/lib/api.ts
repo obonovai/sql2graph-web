@@ -1,15 +1,9 @@
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import type { MappingValidity, Options, Preset, SseEvent, TranslateRequest } from "./types";
+import type { MappingValidity, Options, SseEvent, TranslateRequest } from "@/lib/types";
 
 export async function getOptions(): Promise<Options> {
   const r = await fetch("/api/options");
   if (!r.ok) throw new Error(`/api/options ${r.status}`);
-  return r.json();
-}
-
-export async function getPresets(): Promise<Preset[]> {
-  const r = await fetch("/api/presets");
-  if (!r.ok) throw new Error(`/api/presets ${r.status}`);
   return r.json();
 }
 

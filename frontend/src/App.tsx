@@ -1,15 +1,17 @@
 import { useEffect } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { RUNNING_STATUSES, useStore } from "./store";
-import { CollapsibleSidebar } from "./components/Sidebar";
-import { LlmSettingsForm } from "./components/LlmSettingsForm";
-import { ValidationSettingsForm } from "./components/ValidationSettingsForm";
-import { Header } from "./components/Header";
-import { RunSetupBar } from "./components/RunSetupBar";
-import { InputsPanel } from "./components/InputsPanel";
-import { OutcomePanel } from "./components/OutcomePanel";
-import { ChatSidebar } from "./components/ChatSidebar";
-import { Section } from "./components/primitives";
+import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";
+import { CollapsibleSidebar } from "@/components/ui/Sidebar";
+import { LlmSettingsForm } from "@/components/LlmSettingsForm";
+import { ValidationSettingsForm } from "@/components/ValidationSettingsForm";
+import { Header } from "@/components/Header";
+import { RunSetupBar } from "@/components/RunSetupBar";
+import { InputsPanel } from "@/components/InputsPanel";
+import { OutcomePanel } from "@/components/OutcomePanel";
+import { ChatSidebar } from "@/components/ChatSidebar";
+import { Section } from "@/components/ui/primitives";
+import { useMappingValidation } from "@/hooks/useMappingValidation";
+import { useFeatureDetection } from "@/hooks/useFeatureDetection";
 
 function CollapsedChatRail() {
   const status = useStore((s) => s.stream.status);
@@ -29,8 +31,6 @@ export default function App() {
   const rightOpen = useStore((s) => s.rightOpen);
   const setLeftOpen = useStore((s) => s.setLeftOpen);
   const setRightOpen = useStore((s) => s.setRightOpen);
-  const mappingYaml = useStore((s) => s.form.mappingYaml);
-  const sql = useStore((s) => s.form.sql);
 
   useEffect(() => {
     void useStore.getState().init();
@@ -40,17 +40,9 @@ export default function App() {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  // Debounced live mapping validation.
-  useEffect(() => {
-    const t = setTimeout(() => void useStore.getState().refreshMappingValidity(), 400);
-    return () => clearTimeout(t);
-  }, [mappingYaml]);
-
-  // Debounced SQL feature detection.
-  useEffect(() => {
-    const t = setTimeout(() => void useStore.getState().refreshFeatures(), 400);
-    return () => clearTimeout(t);
-  }, [sql]);
+  // Debounced live mapping validation + SQL feature detection.
+  useMappingValidation();
+  useFeatureDetection();
 
   return (
     <div className="flex h-full w-full flex-col bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-100">

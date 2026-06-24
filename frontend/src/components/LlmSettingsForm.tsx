@@ -1,5 +1,5 @@
-import { useStore } from "../store";
-import { Field, NumberValueInput, Select, Slider, TextInput } from "./primitives";
+import { useStore } from "@/hooks/useStore";
+import { Field, NumberValueInput, Select, Slider, TextInput } from "@/components/ui/primitives";
 
 export function LlmSettingsForm() {
   const llm = useStore((s) => s.form.llm);

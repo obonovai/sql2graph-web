@@ -73,12 +73,6 @@ export interface MappingValidity {
   edge_count: number;
 }
 
-export interface Preset {
-  name: string;
-  mapping_yaml: string;
-  sample_sql: string;
-}
-
 export interface Options {
   providers: Provider[];
   targets: Target[];

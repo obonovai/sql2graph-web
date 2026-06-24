@@ -1,5 +1,5 @@
-import { SERVER_TYPE_BY_TARGET, useStore } from "../store";
-import { Field, NumberValueInput, Select, TextInput } from "./primitives";
+import { SERVER_TYPE_BY_TARGET, useStore } from "@/hooks/useStore";
+import { Field, NumberValueInput, Select, TextInput } from "@/components/ui/primitives";
 
 // Home of the run's validation config: mode, the connection details that only
 // matter for `server` mode, and the iteration budget. Kept in the sidebar so the

@@ -1,7 +1,7 @@
 import { Copy, Download } from "lucide-react";
-import { RUNNING_STATUSES, useStore } from "../store";
-import { CodeEditor } from "./CodeEditor";
-import { Chip, FooterBar, IconButton, PaneHeader, StatusText } from "./primitives";
+import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";
+import { CodeEditor } from "@/components/ui/CodeEditor";
+import { Chip, FooterBar, IconButton, PaneHeader, StatusText } from "@/components/ui/primitives";
 
 const FILE_EXT: Record<string, string> = { cypher: "cypher", aql: "aql", gremlin: "groovy" };
 

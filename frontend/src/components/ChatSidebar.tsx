@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, ChevronDown, ChevronUp, Cog, User } from "lucide-react";
-import { useStore } from "../store";
-import type { Message } from "../types";
-import { cls } from "./primitives";
-
-const RUNNING = new Set(["generating", "validating", "fixing", "provisioning"]);
+import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";
+import type { Message } from "@/lib/types";
+import { cls } from "@/components/ui/primitives";
 
 function SystemBubble({ content }: { content: string }) {
   const [open, setOpen] = useState(false);
@@ -77,7 +75,7 @@ export function ChatSidebar() {
   const status = useStore((s) => s.stream.status);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [stick, setStick] = useState(true);
-  const running = RUNNING.has(status);
+  const running = RUNNING_STATUSES.has(status);
   const lastAssistant = conversation.length > 0 && conversation[conversation.length - 1].role === "assistant";
 
   useEffect(() => {

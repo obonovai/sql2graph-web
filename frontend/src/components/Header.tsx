@@ -1,9 +1,8 @@
 import { Moon, Sun, Workflow } from "lucide-react";
-import { useStore } from "../store";
-import { Chip, IconButton } from "./primitives";
+import { useStore } from "@/hooks/useStore";
+import { Chip, IconButton } from "@/components/ui/primitives";
 
-// App identity bar + global meta (active model, validation mode, theme). Absorbs
-// the chips + theme toggle that used to live on the right of the old Toolbar.
+// App identity bar: brand + active-model chip + theme toggle.
 export function Header() {
   const provider = useStore((s) => s.form.llm.provider);
   const model = useStore((s) => s.form.llm.model);

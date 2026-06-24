@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { useRef } from "react";
 import { Upload } from "lucide-react";
-import { useStore } from "../store";
-import { CodeEditor } from "./CodeEditor";
-import { FeatureChips } from "./FeatureChips";
-import { FooterBar, IconButton, StatusText, cls } from "./primitives";
+import { useStore } from "@/hooks/useStore";
+import { CodeEditor } from "@/components/ui/CodeEditor";
+import { FeatureChips } from "@/components/FeatureChips";
+import { FooterBar, IconButton, StatusText, cls } from "@/components/ui/primitives";
 
 const MAPPING_PLACEHOLDER =
   "nodes:\n  - label: Person\n    source_table: person\n    properties:\n      name: first_name\n    primary_key: id\nedges: []";

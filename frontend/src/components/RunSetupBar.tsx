@@ -1,6 +1,6 @@
 import { Play, Square } from "lucide-react";
-import { RUNNING_STATUSES, useStore } from "../store";
-import { Button, Select } from "./primitives";
+import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";
+import { Button, Select } from "@/components/ui/primitives";
 
 // The primary run controls: pick the target language and translate. Validation
 // mode + iteration budget live in the Settings sidebar (one home, no duplicate).

@@ -1,33 +1,25 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import * as api from "./api";
+import * as api from "@/lib/api";
 import type {
   LlmSettings,
   MappingValidity,
   Message,
   Options,
-  Preset,
   Provider,
   ServerType,
   Target,
   TokenUsage,
   TranslateRequest,
   ValidationMode,
-} from "./types";
+} from "@/lib/types";
 
 export type Status = "idle" | "provisioning" | "generating" | "validating" | "fixing" | "done" | "error";
 
 // Statuses during which a run is actively in flight. Exported so the chrome
-// components (run-setup bar, iteration timeline, chat rail) share one definition
+// components (run-setup bar, result footer, chat rail) share one definition
 // instead of each re-declaring the set.
 export const RUNNING_STATUSES = new Set<Status>(["generating", "validating", "fixing", "provisioning"]);
-
-export interface IterationChip {
-  kind: "validated" | "fix" | "max";
-  iteration: number;
-  passed?: boolean;
-  errorCount?: number;
-}
 
 // A generic bag of every possible server-config field; the relevant subset is
 // picked per target at request-build time.
@@ -61,10 +53,8 @@ interface StreamState {
   finalStatus: string | null; // library result.status: success | max_iterations_reached | stalled
   tokenUsage: TokenUsage | null;
   errorMessage: string | null;
-  chips: IterationChip[];
   // True while the loop has stalled and is retrying with a fresh, hotter context;
-  // transient (lives in `stream`, never persisted). Lets the timeline show an
-  // honest "escalating" pill rather than guessing from `status`.
+  // transient (lives in `stream`, never persisted). Drives the "escalating" label.
   stalled: boolean;
 }
 
@@ -107,7 +97,6 @@ const INITIAL_STREAM: StreamState = {
   finalStatus: null,
   tokenUsage: null,
   errorMessage: null,
-  chips: [],
   stalled: false,
 };
 
@@ -119,7 +108,6 @@ export const SERVER_TYPE_BY_TARGET: Record<Target, ServerType> = {
 
 interface Store {
   options: Options | null;
-  presets: Preset[];
   theme: "light" | "dark";
   leftOpen: boolean;
   rightOpen: boolean;
@@ -144,7 +132,6 @@ interface Store {
   setServer: (patch: Partial<ServerBag>) => void;
   setMappingYaml: (s: string) => void;
   setSql: (s: string) => void;
-  applyPreset: (name: string) => void;
 
   refreshMappingValidity: () => Promise<void>;
   refreshFeatures: () => Promise<void>;
@@ -209,7 +196,6 @@ export const useStore = create<Store>()(
   persist(
     (set, get) => ({
       options: null,
-      presets: [],
       theme: "light",
       leftOpen: true,
       rightOpen: true,
@@ -222,8 +208,8 @@ export const useStore = create<Store>()(
 
       init: async () => {
         try {
-          const [options, presets] = await Promise.all([api.getOptions(), api.getPresets()]);
-          set({ options, presets });
+          const options = await api.getOptions();
+          set({ options });
           // Seed defaults from the library config for new/cleared users, leaving
           // any customized (already-set) value untouched. Model is seeded for the
           // current provider; the Ollama numeric knobs are seeded from the YAML so
@@ -235,7 +221,7 @@ export const useStore = create<Store>()(
           if (llm.num_ctx == null) patch.num_ctx = ollamaDefault(options, "num_ctx");
           if (Object.keys(patch).length > 0) get().setLlm(patch);
         } catch (e) {
-          console.error("Failed to load options/presets", e);
+          console.error("Failed to load options", e);
         }
         if (get().form.mappingYaml.trim()) get().refreshMappingValidity();
       },
@@ -258,14 +244,6 @@ export const useStore = create<Store>()(
         })),
       setMappingYaml: (str) => set((s) => ({ form: { ...s.form, mappingYaml: str } })),
       setSql: (str) => set((s) => ({ form: { ...s.form, sql: str } })),
-
-      applyPreset: (name) => {
-        const preset = get().presets.find((p) => p.name === name);
-        if (!preset) return;
-        set((s) => ({ form: { ...s.form, mappingYaml: preset.mapping_yaml, sql: preset.sample_sql } }));
-        get().refreshMappingValidity();
-        get().refreshFeatures();
-      },
 
       refreshMappingValidity: async () => {
         const yaml = get().form.mappingYaml;
@@ -338,21 +316,11 @@ export const useStore = create<Store>()(
                   st.validationErrors = ev.data.errors;
                   st.validationPassed = ev.data.passed;
                   st.stalled = false;
-                  st.chips = [
-                    ...st.chips,
-                    {
-                      kind: "validated",
-                      iteration: ev.data.iteration,
-                      passed: ev.data.passed,
-                      errorCount: ev.data.errors.length,
-                    },
-                  ];
                   if (!ev.data.passed) st.status = "fixing";
                   break;
                 case "fix":
                   st.generatedQuery = ev.data.query;
                   st.currentIteration = ev.data.iteration + 1;
-                  st.chips = [...st.chips, { kind: "fix", iteration: ev.data.iteration }];
                   st.status = "validating";
                   break;
                 case "stalled":
@@ -364,7 +332,6 @@ export const useStore = create<Store>()(
                   break;
                 case "max_iterations":
                   st.validationErrors = ev.data.errors;
-                  st.chips = [...st.chips, { kind: "max", iteration: ev.data.iteration }];
                   break;
                 case "completed": {
                   const r = ev.data.result;

@@ -1,5 +1,5 @@
-import { useStore } from "../store";
-import { Chip, FooterBar } from "./primitives";
+import { useStore } from "@/hooks/useStore";
+import { Chip, FooterBar } from "@/components/ui/primitives";
 
 export function FeatureChips() {
   const features = useStore((s) => s.features);

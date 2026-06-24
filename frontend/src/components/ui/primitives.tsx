@@ -67,10 +67,6 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={inputCls} {...props} />;
 }
 
-export function NumberInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input type="number" className={inputCls} {...props} />;
-}
-
 // Number field with a [ field ] [−|+] stepper (the native spinner is hidden).
 // The field may be cleared while editing (emits null); on blur an empty field
 // autofills 0 so it is never left blank. With `double`, the buttons double/halve

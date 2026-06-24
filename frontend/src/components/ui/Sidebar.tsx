@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconButton, cls } from "./primitives";
+import { IconButton, cls } from "@/components/ui/primitives";
 
 export function CollapsibleSidebar({
   side,
