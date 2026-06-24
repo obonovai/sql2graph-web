@@ -17,6 +17,11 @@ import type {
 
 export type Status = "idle" | "provisioning" | "generating" | "validating" | "fixing" | "done" | "error";
 
+// Statuses during which a run is actively in flight. Exported so the chrome
+// components (run-setup bar, iteration timeline, chat rail) share one definition
+// instead of each re-declaring the set.
+export const RUNNING_STATUSES = new Set<Status>(["generating", "validating", "fixing", "provisioning"]);
+
 export interface IterationChip {
   kind: "validated" | "fix" | "max";
   iteration: number;
@@ -57,6 +62,10 @@ interface StreamState {
   tokenUsage: TokenUsage | null;
   errorMessage: string | null;
   chips: IterationChip[];
+  // True while the loop has stalled and is retrying with a fresh, hotter context;
+  // transient (lives in `stream`, never persisted). Lets the timeline show an
+  // honest "escalating" pill rather than guessing from `status`.
+  stalled: boolean;
 }
 
 const EMPTY_SERVER: ServerBag = {
@@ -99,6 +108,7 @@ const INITIAL_STREAM: StreamState = {
   tokenUsage: null,
   errorMessage: null,
   chips: [],
+  stalled: false,
 };
 
 export const SERVER_TYPE_BY_TARGET: Record<Target, ServerType> = {
@@ -113,7 +123,7 @@ interface Store {
   theme: "light" | "dark";
   leftOpen: boolean;
   rightOpen: boolean;
-  mappingOpen: boolean;
+  inputTab: "mapping" | "sql";
   form: FormState;
   mappingValidity: MappingValidity | null;
   features: string[];
@@ -124,7 +134,7 @@ interface Store {
   toggleTheme: () => void;
   setLeftOpen: (b: boolean) => void;
   setRightOpen: (b: boolean) => void;
-  setMappingOpen: (b: boolean) => void;
+  setInputTab: (t: "mapping" | "sql") => void;
 
   setTarget: (t: Target) => void;
   setProvider: (p: Provider) => void;
@@ -203,7 +213,7 @@ export const useStore = create<Store>()(
       theme: "light",
       leftOpen: true,
       rightOpen: true,
-      mappingOpen: true,
+      inputTab: "mapping",
       form: DEFAULT_FORM,
       mappingValidity: null,
       features: [],
@@ -233,7 +243,7 @@ export const useStore = create<Store>()(
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setLeftOpen: (b) => set({ leftOpen: b }),
       setRightOpen: (b) => set({ rightOpen: b }),
-      setMappingOpen: (b) => set({ mappingOpen: b }),
+      setInputTab: (t) => set({ inputTab: t }),
 
       setTarget: (t) => set((s) => ({ form: { ...s.form, target: t } })),
       setProvider: (p) =>
@@ -321,11 +331,13 @@ export const useStore = create<Store>()(
                   st.currentIteration = ev.data.iteration;
                   st.generatedQuery = ev.data.query;
                   st.status = "validating";
+                  st.stalled = false;
                   break;
                 case "validated":
                   st.currentIteration = ev.data.iteration;
                   st.validationErrors = ev.data.errors;
                   st.validationPassed = ev.data.passed;
+                  st.stalled = false;
                   st.chips = [
                     ...st.chips,
                     {
@@ -348,6 +360,7 @@ export const useStore = create<Store>()(
                   // hotter retry. Keep showing activity (a fix is in flight).
                   st.validationErrors = ev.data.errors;
                   st.status = "fixing";
+                  st.stalled = true;
                   break;
                 case "max_iterations":
                   st.validationErrors = ev.data.errors;
@@ -363,6 +376,7 @@ export const useStore = create<Store>()(
                   st.finalStatus = r.status;
                   st.tokenUsage = r.token_usage ?? null;
                   st.status = "done";
+                  st.stalled = false;
                   break;
                 }
                 case "error":
@@ -395,11 +409,21 @@ export const useStore = create<Store>()(
     }),
     {
       name: "rows2graph-web",
+      version: 1,
+      // v0 persisted a `mappingOpen` flag (the schema-mapping drawer). The drawer
+      // is gone — mapping is now an input tab (`inputTab`) — so drop the stale key
+      // while preserving the user's saved `form` (SQL + mapping). `inputTab` is
+      // absent from old storage and falls back to its initial value.
+      migrate: (persisted: unknown) => {
+        const s = { ...((persisted as Record<string, unknown>) ?? {}) };
+        delete s.mappingOpen;
+        return s as unknown as Store;
+      },
       partialize: (s) => ({
         theme: s.theme,
         leftOpen: s.leftOpen,
         rightOpen: s.rightOpen,
-        mappingOpen: s.mappingOpen,
+        inputTab: s.inputTab,
         form: s.form,
       }),
     },

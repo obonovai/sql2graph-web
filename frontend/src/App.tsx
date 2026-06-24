@@ -1,59 +1,21 @@
 import { useEffect } from "react";
-import { Play, Square } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { useStore } from "./store";
+import { RUNNING_STATUSES, useStore } from "./store";
 import { CollapsibleSidebar } from "./components/Sidebar";
 import { LlmSettingsForm } from "./components/LlmSettingsForm";
 import { ValidationSettingsForm } from "./components/ValidationSettingsForm";
-import { Toolbar } from "./components/Toolbar";
-import { MappingDrawer } from "./components/MappingDrawer";
-import { FeatureChips } from "./components/FeatureChips";
-import { SqlEditor } from "./components/SqlEditor";
-import { ResultPane } from "./components/ResultPane";
+import { Header } from "./components/Header";
+import { RunSetupBar } from "./components/RunSetupBar";
+import { InputsPanel } from "./components/InputsPanel";
+import { OutcomePanel } from "./components/OutcomePanel";
 import { ChatSidebar } from "./components/ChatSidebar";
-import { StatusStrip } from "./components/StatusStrip";
-import { Button, Section } from "./components/primitives";
-
-const RUNNING = new Set(["generating", "validating", "fixing", "provisioning"]);
-
-function Actions() {
-  const sql = useStore((s) => s.form.sql);
-  const validity = useStore((s) => s.mappingValidity);
-  const status = useStore((s) => s.stream.status);
-  const translate = useStore((s) => s.translate);
-  const stop = useStore((s) => s.stop);
-  const clearWorkspace = useStore((s) => s.clearWorkspace);
-
-  const running = RUNNING.has(status);
-  const canTranslate = !running && !!sql.trim() && !!validity?.valid;
-
-  return (
-    <div className="flex items-center justify-start gap-2 border-t border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
-      {running ? (
-        <Button variant="danger" onClick={stop}>
-          <Square className="h-4 w-4" /> Stop
-        </Button>
-      ) : (
-        <Button
-          variant="primary"
-          onClick={() => void translate()}
-          disabled={!canTranslate}
-          title={!sql.trim() ? "Enter a SQL query" : !validity?.valid ? "Provide a valid schema mapping" : "Translate"}
-        >
-          <Play className="h-4 w-4" /> Translate
-        </Button>
-      )}
-      <Button variant="default" onClick={clearWorkspace} disabled={running}>
-        Clear
-      </Button>
-    </div>
-  );
-}
+import { IterationTimeline } from "./components/IterationTimeline";
+import { Section } from "./components/primitives";
 
 function CollapsedChatRail() {
   const status = useStore((s) => s.stream.status);
   const iter = useStore((s) => s.stream.currentIteration);
-  if (!RUNNING.has(status)) return null;
+  if (!RUNNING_STATUSES.has(status)) return null;
   return (
     <div className="mt-1 flex flex-col items-center gap-1">
       <span className="h-2 w-2 animate-ping rounded-full bg-indigo-500" />
@@ -66,7 +28,6 @@ export default function App() {
   const theme = useStore((s) => s.theme);
   const leftOpen = useStore((s) => s.leftOpen);
   const rightOpen = useStore((s) => s.rightOpen);
-  const mappingOpen = useStore((s) => s.mappingOpen);
   const setLeftOpen = useStore((s) => s.setLeftOpen);
   const setRightOpen = useStore((s) => s.setRightOpen);
   const mappingYaml = useStore((s) => s.form.mappingYaml);
@@ -105,22 +66,20 @@ export default function App() {
         </CollapsibleSidebar>
 
         <section className="flex min-w-0 flex-1 flex-col">
-          <Toolbar />
-          {mappingOpen && <MappingDrawer />}
-          <FeatureChips />
+          <Header />
+          <RunSetupBar />
           <div className="min-h-0 flex-1 p-2">
             <PanelGroup direction="horizontal" className="h-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-              <Panel defaultSize={50} minSize={20} className="bg-white dark:bg-slate-900">
-                <SqlEditor />
+              <Panel defaultSize={50} minSize={25} className="bg-white dark:bg-slate-900">
+                <InputsPanel />
               </Panel>
               <PanelResizeHandle className="w-1.5 bg-slate-200 transition-colors hover:bg-indigo-400 data-[resize-handle-state=drag]:bg-indigo-500 dark:bg-slate-700" />
-              <Panel defaultSize={50} minSize={20} className="bg-white dark:bg-slate-900">
-                <ResultPane />
+              <Panel defaultSize={50} minSize={25} className="bg-white dark:bg-slate-900">
+                <OutcomePanel />
               </Panel>
             </PanelGroup>
           </div>
-          <StatusStrip />
-          <Actions />
+          <IterationTimeline />
         </section>
 
         <CollapsibleSidebar
