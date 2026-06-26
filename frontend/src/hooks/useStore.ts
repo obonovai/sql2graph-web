@@ -1,3 +1,7 @@
+// Central Zustand store — the single source of truth for all UI + run state.
+// Owns the form, the live translation `stream` state, persistence (with a versioned
+// migration), the exported domain constants (RUNNING_STATUSES, SERVER_TYPE_BY_TARGET),
+// and the SSE→state reducer inside `translate()`. Components subscribe via selectors.
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as api from "@/lib/api";
@@ -297,6 +301,9 @@ export const useStore = create<Store>()(
           onEvent: (ev) => {
             set((s) => {
               const st = { ...s.stream };
+              // Reduce one SSE event into stream state. Lifecycle per run:
+              // status? → conversation* → generated → validated → (fix | stalled →
+              // validated)* → completed | max_iterations | error.
               switch (ev.event) {
                 case "status":
                   if (ev.data.phase === "provisioning") st.status = "provisioning";

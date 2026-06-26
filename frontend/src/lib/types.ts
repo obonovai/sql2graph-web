@@ -1,3 +1,6 @@
+// Shared domain + API types, mirrored from the backend's Pydantic models
+// (backend/app/models.py) and the translate SSE event shapes (backend/app/bridge.py).
+// Keep these in sync with the backend when either side changes.
 export type Provider = "ollama" | "anthropic";
 export type Target = "cypher" | "aql" | "gremlin";
 export type ValidationMode = "none" | "syntax" | "server";

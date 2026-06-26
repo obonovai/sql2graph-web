@@ -45,6 +45,8 @@ def build_mapping(mapping_yaml: str) -> SchemaMapping:
 
 
 def build_model_config(llm: LlmSettings) -> ModelConfig:
+    """Build the provider-specific LLM config (Anthropic or Ollama) from the form,
+    dropping unset fields so the library keeps its own defaults."""
     if llm.provider == "anthropic":
         return AnthropicConfig(
             **_clean(
@@ -72,6 +74,8 @@ def build_model_config(llm: LlmSettings) -> ModelConfig:
 
 
 def build_server_config(sc: ServerSettings) -> ServerConfig:
+    """Build the target-specific server-validation config (Neo4j / ArangoDB /
+    Gremlin) from the connection form."""
     if sc.type == "neo4j":
         return Neo4jConfig(
             **_clean(

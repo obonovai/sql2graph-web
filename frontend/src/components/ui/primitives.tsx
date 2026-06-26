@@ -1,3 +1,7 @@
+// Store-free, presentational design-system primitives shared across the app:
+// Button, IconButton, form controls (Field / TextInput / NumberValueInput / Select /
+// Slider), Chip, PaneHeader, FooterBar, StatusText, Section, Spinner, and the cls()
+// className helper. Nothing here reads the store.
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { useState } from "react";
 import { AlertTriangle, Check, ChevronDown, ChevronUp, X } from "lucide-react";

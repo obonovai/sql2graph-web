@@ -1,3 +1,5 @@
+// Thin CodeMirror wrapper: a controlled SQL/YAML editor that fills its container,
+// follows the light/dark theme, and submits on Cmd/Ctrl+Enter.
 import CodeMirror from "@uiw/react-codemirror";
 import { sql } from "@codemirror/lang-sql";
 import { yaml } from "@codemirror/lang-yaml";

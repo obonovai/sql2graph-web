@@ -1,3 +1,5 @@
+// Settings-sidebar form: LLM provider + model + sampling knobs. Provider-specific
+// fields toggle (Anthropic: max output tokens; Ollama: context window + repeat penalty).
 import { useStore } from "@/hooks/useStore";
 import { Field, NumberValueInput, Select, Slider, TextInput } from "@/components/ui/primitives";
 

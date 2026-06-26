@@ -1,3 +1,5 @@
+// SQL footer: the detected-feature chips — which SQL features the translator found
+// in the query (these tailor/trim the prompt sent to the model). Hidden when empty.
 import { useStore } from "@/hooks/useStore";
 import { Chip, FooterBar } from "@/components/ui/primitives";
 

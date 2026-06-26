@@ -1,3 +1,6 @@
+// Typed client for the FastAPI backend: small REST helpers (options,
+// validate-mapping, detect-features) and the `translate` Server-Sent-Events stream
+// that the store consumes. Adds no logic of its own — just fetch + typing.
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import type { MappingValidity, Options, SseEvent, TranslateRequest } from "@/lib/types";
 

@@ -1,3 +1,5 @@
+// Chat sidebar: the live system↔LLM transcript, streamed token-by-token as
+// collapsible System / User / Assistant bubbles, auto-sticking to the bottom.
 import { useEffect, useRef, useState } from "react";
 import { Bot, ChevronDown, ChevronUp, Cog, User } from "lucide-react";
 import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";

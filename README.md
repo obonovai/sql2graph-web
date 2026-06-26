@@ -6,10 +6,13 @@ backend calls the same public library API that `rows2graph/demo/cli.py` uses and
 translation logic of its own.
 
 ```
-┌Settings─┐ ┌ Toolbar: Target · Schema mapping ─┐ ┌Chat──────────┐
-│ LLM     │ │ SQL input        ║ Result query    │ │ system ↔ LLM │
-│ Valid.  │ │ ─ status ─ [Translate] [Clear] ─── │ │ (streaming)  │
-└─────────┘ └────────────────────────────────────┘ └──────────────┘
+┌Settings──┐ ┌ Header:  rows2graph · model · ☾ ────────────────┐ ┌Chat──────┐
+│ LLM      │ │ Run setup:  Target ▾       [▸ Translate] [Clear] │ │ system ↔ │
+│ Valid.   │ │ ┌ Mapping │ SQL ┐    ║    ┌ Result ───────────┐  │ │ LLM      │
+│ (server) │ │ │  editor…       │    ║    │  generated query… │  │ │ stream   │
+│          │ │ └ ✓ 7 nodes·8 e  ┘    ║    └ ✓ success · 2 it… ┘  │ │          │
+└──────────┘ └──────────────────────────────────────────────────┘ └──────────┘
+        (║ = the draggable divider between the Inputs and Result panes)
 ```
 
 ## Architecture
@@ -19,11 +22,13 @@ translation logic of its own.
   callbacks to **Server-Sent Events** via an `asyncio.Queue`. Conversation snapshots (which fire
   per token and resend the whole transcript) are coalesced to ~12 fps; the translator runs inside
   `async with` so the LLM client, DB connections, and any throwaway managed DB are torn down on
-  completion or client disconnect.
-- **Frontend** (`frontend/`, Vite + React + TS): three-column shell (collapsible Settings sidebar ·
-  SQL ∥ Result workbench · collapsible live Chat sidebar), Tailwind styling, CodeMirror editors,
-  `react-resizable-panels`, and `@microsoft/fetch-event-source` to POST the request and consume the
-  SSE stream.
+  completion or client disconnect. See **[`backend/README.md`](backend/README.md)**.
+- **Frontend** (`frontend/`, Vite + React + TS): a three-column shell — collapsible Settings
+  sidebar · center workbench · collapsible live Chat sidebar. The center stacks a Header, a
+  Run-setup bar (target + Translate), and a resizable **Inputs ∥ Result** split: the inputs pane
+  carries the schema mapping (YAML) and SQL as co-equal tabs, the result pane shows the generated
+  query plus the run outcome. Zustand store, Tailwind, CodeMirror, `react-resizable-panels`, and
+  `@microsoft/fetch-event-source` for the SSE stream. See **[`frontend/README.md`](frontend/README.md)**.
 
 ## Prerequisites
 
@@ -51,8 +56,8 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Load the **tpch** or **ldbc** preset (fills the mapping + a sample
-query), pick a target, and click **Translate**.
+Open http://localhost:5173. Paste or **upload** a schema mapping (YAML) and a SQL query, pick a
+target, and click **Translate**. (Ready-made sample mappings live in `rows2graph/config/mappings/`.)
 
 ## Build (production)
 
@@ -84,7 +89,7 @@ When `frontend/dist/` exists the backend serves the SPA from `/` (same origin, n
 |---|---|---|
 | GET | `/api/health` | Liveness. |
 | GET | `/api/options` | Enums + library defaults + Docker availability for the forms. |
-| GET | `/api/presets` | Bundled tpch/ldbc mappings + sample SQL. |
+| GET | `/api/presets` | Bundled tpch/ldbc mappings + sample SQL (backend only — the current UI doesn't auto-load them). |
 | POST | `/api/validate-mapping` | Validate a mapping YAML string (`{valid, errors, node_count, edge_count}`). |
 | POST | `/api/detect-features` | The SQL features the translator detects (for the chips). |
 | POST | `/api/translate` | SSE stream: `status`/`conversation`/`generated`/`validated`/`fix`/`max_iterations`/`completed`/`error`. |
