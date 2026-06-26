@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import logging
 from typing import Any
 
@@ -10,6 +11,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticUndefined
 from rows2graph import (
+    TARGET_SERVER_TYPE,
+    VALID_PROVIDERS,
+    VALID_TARGETS,
+    VALID_VALIDATION_MODES,
     ArangoDBConfig,
     GremlinConfig,
     Neo4jConfig,
@@ -35,8 +40,13 @@ def _defaults(model: type[BaseModel]) -> dict[str, Any]:
     return out
 
 
+@functools.lru_cache(maxsize=1)
 def _docker_available() -> bool:
-    """Best-effort check so the UI can warn before empty-config 'server' mode."""
+    """Best-effort check so the UI can warn before empty-config 'server' mode.
+
+    Cached: the daemon ping runs once per process rather than on every
+    ``/api/options`` request.
+    """
     try:
         import docker  # type: ignore[import-untyped]
 
@@ -44,6 +54,7 @@ def _docker_available() -> bool:
         client.ping()
         return True
     except Exception:  # noqa: BLE001
+        logger.info("Docker not available — empty-config 'server' validation will be disabled in the UI.")
         return False
 
 
@@ -58,9 +69,10 @@ def options() -> dict[str, Any]:
     library's own config models and example config files."""
     model_defaults = presets.load_model_defaults()
     return {
-        "providers": ["ollama", "anthropic"],
-        "targets": ["cypher", "aql", "gremlin"],
-        "validation_modes": ["none", "syntax", "server"],
+        # Enums sourced from the library so they can't drift from it.
+        "providers": list(VALID_PROVIDERS),
+        "targets": list(VALID_TARGETS),
+        "validation_modes": list(VALID_VALIDATION_MODES),
         "defaults": {
             "anthropic": model_defaults["anthropic"],
             "ollama": model_defaults["ollama"],
@@ -72,7 +84,8 @@ def options() -> dict[str, Any]:
             "gremlin": _defaults(GremlinConfig),
         },
         # which server type each target needs for 'server' validation
-        "target_server_type": {"cypher": "neo4j", "aql": "arangodb", "gremlin": "gremlin"},
+        "target_server_type": dict(TARGET_SERVER_TYPE),
+        # mirrors Neo4jConfig.notifications_min_severity
         "notifications_min_severity_options": ["OFF", "INFORMATION", "WARNING"],
         "docker_available": _docker_available(),
     }
@@ -85,16 +98,15 @@ def get_presets() -> list[presets.Preset]:
 
 @router.post("/validate-mapping")
 def validate_mapping(body: MappingBody) -> dict[str, Any]:
-    """Parse + validate a mapping YAML string for the inline validity indicator."""
+    """Parse + validate a mapping YAML string for the inline validity indicator.
+
+    Shares the library's single parse path (``SchemaMapping.from_yaml_string``) with
+    the translate endpoint, so the indicator can't diverge from real validation.
+    """
     try:
-        data = yaml.safe_load(body.mapping_yaml)
+        mapping = SchemaMapping.from_yaml_string(body.mapping_yaml)
     except yaml.YAMLError as exc:
         return {"valid": False, "errors": [f"YAML parse error: {exc}"], "node_count": 0, "edge_count": 0}
-    if not isinstance(data, dict):
-        return {"valid": False, "errors": ["Mapping must be a YAML mapping with 'nodes' and 'edges'."],
-                "node_count": 0, "edge_count": 0}
-    try:
-        mapping = SchemaMapping.model_validate(data)
     except ValidationError as exc:
         errors = [f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors()]
         return {"valid": False, "errors": errors, "node_count": 0, "edge_count": 0}

@@ -9,7 +9,13 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "sse-starlette>=2.1",
     "pyyaml>=6.0",
+    "pydantic>=2.12",
 ]
+
+# Optional: enables the throwaway-DB availability check in /api/options. The
+# `docker` import is soft (try/except), so the backend runs fine without it.
+[project.optional-dependencies]
+docker = ["docker>=7"]
 
 # The library lives in the sibling repo and is installed editable into the same
 # venv, so the backend imports rows2graph exactly as a third-party user would.

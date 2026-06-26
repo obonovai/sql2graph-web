@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-import yaml
 from rows2graph import (
     AnthropicConfig,
     ArangoDBConfig,
@@ -22,6 +21,7 @@ from rows2graph import (
     make_async_llm,
     make_async_validator,
     make_target,
+    resolve_validation_mode,
 )
 
 from .models import LlmSettings, ServerSettings, TranslateRequest
@@ -34,14 +34,6 @@ def _clean(d: dict[str, Any]) -> dict[str, Any]:
     """Drop None values so the library's strict (extra='forbid') configs keep
     their own defaults instead of receiving an unexpected ``None``."""
     return {k: v for k, v in d.items() if v is not None}
-
-
-def build_mapping(mapping_yaml: str) -> SchemaMapping:
-    """Parse + validate a mapping YAML string. Equivalent to ``from_yaml`` but
-    from a textarea rather than a file (the library's from_yaml is just
-    ``safe_load`` + ``model_validate``)."""
-    data = yaml.safe_load(mapping_yaml)
-    return SchemaMapping.model_validate(data)
 
 
 def build_model_config(llm: LlmSettings) -> ModelConfig:
@@ -120,7 +112,7 @@ def build_translator(req: TranslateRequest) -> tuple[AsyncSQLTranslator, str]:
     """Construct the translator from the request, returning it plus the effective
     validation mode (``server`` with an empty config resolves to ``managed`` —
     the same rule demo/cli.py applies)."""
-    mapping = build_mapping(req.mapping_yaml)
+    mapping = SchemaMapping.from_yaml_string(req.mapping_yaml)
     model_cfg = build_model_config(req.llm)
 
     mode = req.validation.mode
@@ -129,7 +121,7 @@ def build_translator(req: TranslateRequest) -> tuple[AsyncSQLTranslator, str]:
         req.validation.server_config
     ):
         server_cfg = build_server_config(req.validation.server_config)
-    effective_mode = "managed" if (mode == "server" and server_cfg is None) else mode
+    effective_mode = resolve_validation_mode(mode, server_config=server_cfg)
 
     llm = make_async_llm(model_cfg)
     target = make_target(req.target)

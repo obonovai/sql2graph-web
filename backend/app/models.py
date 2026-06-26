@@ -11,6 +11,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+# These mirror rows2graph's VALID_PROVIDERS / VALID_TARGETS / VALID_VALIDATION_MODES
+# and TARGET_SERVER_TYPE values. They stay spelled out here because a typing.Literal
+# needs compile-time members (it can't be built from the library's runtime tuples);
+# keep them in sync if the library's sets change.
 Provider = Literal["ollama", "anthropic"]
 Target = Literal["cypher", "aql", "gremlin"]
 ValidationMode = Literal["none", "syntax", "server"]
