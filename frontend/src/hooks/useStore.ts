@@ -54,12 +54,19 @@ interface StreamState {
   validationPassed: boolean | null;
   durationSeconds: number | null;
   iterationsUsed: number | null;
-  finalStatus: string | null; // library result.status: success | max_iterations_reached | stalled
+  // library result.status: success | max_iterations_reached | stalled | unmapped_tables | parse_error
+  finalStatus: string | null;
   tokenUsage: TokenUsage | null;
   errorMessage: string | null;
   // True while the loop has stalled and is retrying with a fresh, hotter context;
   // transient (lives in `stream`, never persisted). Drives the "escalating" label.
   stalled: boolean;
+  // Pre-flight signals for this run: a parse-failure warning (translation still
+  // proceeds), the unmapped tables that caused a rejection (LLM skipped), and the
+  // unmapped columns (a warning by default — translation still proceeds).
+  parseWarning: string | null;
+  unmappedTables: string[] | null;
+  unmappedColumns: string[] | null;
 }
 
 const EMPTY_SERVER: ServerBag = {
@@ -102,6 +109,9 @@ const INITIAL_STREAM: StreamState = {
   tokenUsage: null,
   errorMessage: null,
   stalled: false,
+  parseWarning: null,
+  unmappedTables: null,
+  unmappedColumns: null,
 };
 
 export const SERVER_TYPE_BY_TARGET: Record<Target, ServerType> = {
@@ -119,6 +129,10 @@ interface Store {
   form: FormState;
   mappingValidity: MappingValidity | null;
   features: string[];
+  // Live (as-you-type) pre-flight feedback, independent of a run:
+  sqlParseOk: boolean; // false → SQL won't parse; show a "will translate anyway" hint
+  coverageUnmapped: string[]; // SQL tables absent from the current mapping
+  coverageUnmappedColumns: string[]; // SQL columns of mapped tables the mapping omits
   stream: StreamState;
   abort: AbortController | null;
 
@@ -139,6 +153,7 @@ interface Store {
 
   refreshMappingValidity: () => Promise<void>;
   refreshFeatures: () => Promise<void>;
+  refreshCoverage: () => Promise<void>;
   translate: () => Promise<void>;
   stop: () => void;
   clearWorkspace: () => void;
@@ -207,6 +222,9 @@ export const useStore = create<Store>()(
       form: DEFAULT_FORM,
       mappingValidity: null,
       features: [],
+      sqlParseOk: true,
+      coverageUnmapped: [],
+      coverageUnmappedColumns: [],
       stream: INITIAL_STREAM,
       abort: null,
 
@@ -265,11 +283,30 @@ export const useStore = create<Store>()(
       refreshFeatures: async () => {
         const sql = get().form.sql;
         if (!sql.trim()) {
-          set({ features: [] });
+          set({ features: [], sqlParseOk: true });
           return;
         }
         try {
-          set({ features: await api.detectFeatures(sql) });
+          const { features, parse_ok } = await api.detectFeatures(sql);
+          set({ features, sqlParseOk: parse_ok });
+        } catch {
+          /* keep previous */
+        }
+      },
+
+      refreshCoverage: async () => {
+        // Live mirror of the translator's unmapped-tables check: which SQL
+        // tables aren't in the current mapping. Needs both SQL and mapping, so
+        // it re-runs when either changes (see useTableCoverage). The backend
+        // soft-fails (empty list) on unparseable SQL or an invalid mapping.
+        const { sql, mappingYaml } = get().form;
+        if (!sql.trim() || !mappingYaml.trim()) {
+          set({ coverageUnmapped: [], coverageUnmappedColumns: [] });
+          return;
+        }
+        try {
+          const { unmapped_tables, unmapped_columns } = await api.checkCoverage(sql, mappingYaml);
+          set({ coverageUnmapped: unmapped_tables, coverageUnmappedColumns: unmapped_columns });
         } catch {
           /* keep previous */
         }
@@ -283,7 +320,13 @@ export const useStore = create<Store>()(
           s.stream.status !== "fixing" &&
           s.stream.status !== "provisioning" &&
           !!s.form.sql.trim() &&
-          !!s.mappingValidity?.valid
+          !!s.mappingValidity?.valid &&
+          // Reject-level pre-flight signals: don't call translate() for input the
+          // library would reject (unmapped tables/columns). The library still
+          // rejects programmatically; the UI just avoids the wasted call. Parse
+          // failure is a warning, not a reject, so it does not gate.
+          s.coverageUnmapped.length === 0 &&
+          s.coverageUnmappedColumns.length === 0
         );
       },
 
@@ -307,6 +350,19 @@ export const useStore = create<Store>()(
               switch (ev.event) {
                 case "status":
                   if (ev.data.phase === "provisioning") st.status = "provisioning";
+                  break;
+                case "parse_warning":
+                  // Non-blocking: the SQL didn't parse but translation proceeds.
+                  st.parseWarning = ev.data.message;
+                  break;
+                case "unmapped_tables":
+                  // The run was rejected before the LLM; `completed` follows.
+                  st.unmappedTables = ev.data.tables;
+                  break;
+                case "unmapped_columns":
+                  // Warn by default (translation continues); a reject would
+                  // additionally arrive as finalStatus on `completed`.
+                  st.unmappedColumns = ev.data.columns;
                   break;
                 case "conversation":
                   st.conversation = ev.data;
@@ -348,6 +404,10 @@ export const useStore = create<Store>()(
                   st.durationSeconds = r.duration_seconds;
                   st.iterationsUsed = r.iterations_used;
                   st.finalStatus = r.status;
+                  st.unmappedTables = r.unmapped_tables ?? st.unmappedTables;
+                  // Keep the event-set value if the result's list is empty, so a
+                  // warn (default) banner doesn't get cleared on completion.
+                  if (r.unmapped_columns && r.unmapped_columns.length > 0) st.unmappedColumns = r.unmapped_columns;
                   st.tokenUsage = r.token_usage ?? null;
                   st.status = "done";
                   st.stalled = false;
@@ -379,7 +439,14 @@ export const useStore = create<Store>()(
       },
 
       clearWorkspace: () =>
-        set((s) => ({ form: { ...s.form, sql: "" }, stream: INITIAL_STREAM, features: [] })),
+        set((s) => ({
+          form: { ...s.form, sql: "" },
+          stream: INITIAL_STREAM,
+          features: [],
+          sqlParseOk: true,
+          coverageUnmapped: [],
+          coverageUnmappedColumns: [],
+        })),
     }),
     {
       name: "rows2graph-web",

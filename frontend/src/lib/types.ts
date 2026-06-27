@@ -63,7 +63,13 @@ export interface TranslationResult {
   validation_passed: boolean;
   validation_errors: string[];
   iterations_used: number;
+  // "success" | "max_iterations_reached" | "stalled" | "unmapped_tables" | "unmapped_columns" | "parse_error"
   status: string;
+  // Source tables absent from the schema mapping; populated when status === "unmapped_tables".
+  unmapped_tables?: string[];
+  // "table.column" refs of mapped tables the mapping doesn't define; set on the
+  // unmapped-columns signal (warn or reject).
+  unmapped_columns?: string[];
   duration_seconds: number;
   // Optional so the UI degrades gracefully if the editable library predates the feature.
   token_usage?: TokenUsage;
@@ -95,6 +101,9 @@ export interface Options {
 export type SseEvent =
   | { event: "status"; data: { phase: string } }
   | { event: "conversation"; data: Message[] }
+  | { event: "parse_warning"; data: { message: string } }
+  | { event: "unmapped_tables"; data: { tables: string[]; message: string } }
+  | { event: "unmapped_columns"; data: { columns: string[]; message: string } }
   | { event: "generated"; data: { iteration: number; query: string } }
   | { event: "validated"; data: { iteration: number; query: string; errors: string[]; passed: boolean } }
   | { event: "fix"; data: { iteration: number; query: string } }
@@ -102,3 +111,16 @@ export type SseEvent =
   | { event: "max_iterations"; data: { iteration: number; errors: string[] } }
   | { event: "completed"; data: { result: TranslationResult } }
   | { event: "error"; data: { message: string } };
+
+// /api/detect-features response.
+export interface FeatureDetection {
+  features: string[];
+  parse_ok: boolean;
+}
+
+// /api/check-coverage response.
+export interface CoverageCheck {
+  unmapped_tables: string[];
+  unmapped_columns: string[];
+  parse_ok: boolean;
+}

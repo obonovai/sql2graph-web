@@ -2,7 +2,14 @@
 // validate-mapping, detect-features) and the `translate` Server-Sent-Events stream
 // that the store consumes. Adds no logic of its own — just fetch + typing.
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import type { MappingValidity, Options, SseEvent, TranslateRequest } from "@/lib/types";
+import type {
+  CoverageCheck,
+  FeatureDetection,
+  MappingValidity,
+  Options,
+  SseEvent,
+  TranslateRequest,
+} from "@/lib/types";
 
 export async function getOptions(): Promise<Options> {
   const r = await fetch("/api/options");
@@ -20,15 +27,24 @@ export async function validateMapping(mapping_yaml: string): Promise<MappingVali
   return r.json();
 }
 
-export async function detectFeatures(sql: string): Promise<string[]> {
+export async function detectFeatures(sql: string): Promise<FeatureDetection> {
   const r = await fetch("/api/detect-features", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql }),
   });
   if (!r.ok) throw new Error(`/api/detect-features ${r.status}`);
-  const data = (await r.json()) as { features: string[] };
-  return data.features;
+  return r.json();
+}
+
+export async function checkCoverage(sql: string, mapping_yaml: string): Promise<CoverageCheck> {
+  const r = await fetch("/api/check-coverage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sql, mapping_yaml }),
+  });
+  if (!r.ok) throw new Error(`/api/check-coverage ${r.status}`);
+  return r.json();
 }
 
 class FatalSseError extends Error {}

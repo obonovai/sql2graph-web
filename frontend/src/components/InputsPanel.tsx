@@ -4,7 +4,8 @@ import { Upload } from "lucide-react";
 import { useStore } from "@/hooks/useStore";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { FeatureChips } from "@/components/FeatureChips";
-import { FooterBar, IconButton, StatusText, cls } from "@/components/ui/primitives";
+import { SqlPreflightBanner } from "@/components/SqlPreflightBanner";
+import { FooterBar, IconButton, IssueStrip, StatusText, cls } from "@/components/ui/primitives";
 
 const MAPPING_PLACEHOLDER =
   "nodes:\n  - label: Person\n    source_table: person\n    properties:\n      name: first_name\n    primary_key: id\nedges: []";
@@ -38,6 +39,9 @@ export function InputsPanel() {
   const sql = useStore((s) => s.form.sql);
   const setSql = useStore((s) => s.setSql);
   const validity = useStore((s) => s.mappingValidity);
+  const sqlParseOk = useStore((s) => s.sqlParseOk);
+  const coverageUnmapped = useStore((s) => s.coverageUnmapped);
+  const coverageUnmappedColumns = useStore((s) => s.coverageUnmappedColumns);
   const theme = useStore((s) => s.theme);
   const refreshValidity = useStore((s) => s.refreshMappingValidity);
   const refreshFeatures = useStore((s) => s.refreshFeatures);
@@ -46,6 +50,15 @@ export function InputsPanel() {
   const sqlFileRef = useRef<HTMLInputElement>(null);
 
   const dot = validity == null ? "bg-slate-300" : validity.valid ? "bg-emerald-500" : "bg-rose-500";
+  // SQL tab dot, mirroring the mapping dot: grey (empty) → red (would reject on an
+  // unmapped table or column) → amber (won't parse, a warning) → green (clean).
+  const sqlDot = !sql.trim()
+    ? "bg-slate-300"
+    : coverageUnmapped.length > 0 || coverageUnmappedColumns.length > 0
+      ? "bg-rose-500"
+      : !sqlParseOk
+        ? "bg-amber-500"
+        : "bg-emerald-500";
 
   const onUpload = (file: File) => {
     const reader = new FileReader();
@@ -73,6 +86,7 @@ export function InputsPanel() {
           Schema mapping
         </Tab>
         <Tab active={tab === "sql"} onClick={() => setTab("sql")}>
+          <span className={cls("h-2 w-2 rounded-full", sqlDot)} />
           SQL
         </Tab>
         <div className="ml-auto flex items-center pr-2">
@@ -108,11 +122,7 @@ export function InputsPanel() {
           }}
         />
         {validity && !validity.valid && validity.errors.length > 0 && (
-          <ul className="max-h-24 shrink-0 overflow-y-auto border-t border-rose-100 bg-rose-50 px-3 py-1.5 text-[11px] text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-            {validity.errors.map((e, i) => (
-              <li key={i}>• {e}</li>
-            ))}
-          </ul>
+          <IssueStrip tone="error" lines={validity.errors} />
         )}
         {/* Validity footer — shared FooterBar + StatusText. */}
         <FooterBar>
@@ -154,6 +164,7 @@ export function InputsPanel() {
             e.target.value = "";
           }}
         />
+        <SqlPreflightBanner />
         <FeatureChips />
       </div>
     </div>

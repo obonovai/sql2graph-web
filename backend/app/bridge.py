@@ -34,8 +34,11 @@ from rows2graph import (
     FixGeneratedEvent,
     GeneratedEvent,
     MaxIterationsReachedEvent,
+    ParseFailedEvent,
     StalledEvent,
     TranslationEvent,
+    UnmappedColumnsEvent,
+    UnmappedTablesEvent,
     ValidatedEvent,
 )
 
@@ -53,6 +56,12 @@ def _sse(event: str, data: Any) -> dict[str, str]:
 
 def _event_to_sse(event: TranslationEvent) -> dict[str, str]:
     match event:
+        case ParseFailedEvent(message=m):
+            return _sse("parse_warning", {"message": m})
+        case UnmappedTablesEvent(tables=tables, message=m):
+            return _sse("unmapped_tables", {"tables": list(tables), "message": m})
+        case UnmappedColumnsEvent(columns=cols, message=m):
+            return _sse("unmapped_columns", {"columns": list(cols), "message": m})
         case GeneratedEvent(iteration=i, query=q):
             return _sse("generated", {"iteration": i, "query": q})
         case ValidatedEvent(iteration=i, query=q, errors=errs, passed=passed):

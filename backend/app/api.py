@@ -19,13 +19,14 @@ from rows2graph import (
     GremlinConfig,
     Neo4jConfig,
     SchemaMapping,
+    analyze_sql,
 )
-from rows2graph.sql_features import detect_features
+from rows2graph.preflight import find_unmapped_columns, find_unmapped_tables
 from sse_starlette.sse import EventSourceResponse
 
 from . import library, presets
 from .bridge import stream
-from .models import MappingBody, SqlBody, TranslateRequest
+from .models import CoverageBody, MappingBody, SqlBody, TranslateRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -108,18 +109,80 @@ def validate_mapping(body: MappingBody) -> dict[str, Any]:
     except yaml.YAMLError as exc:
         return {"valid": False, "errors": [f"YAML parse error: {exc}"], "node_count": 0, "edge_count": 0}
     except ValidationError as exc:
-        errors = [f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors()]
-        return {"valid": False, "errors": errors, "node_count": 0, "edge_count": 0}
+        return {"valid": False, "errors": _format_validation_errors(exc), "node_count": 0, "edge_count": 0}
     return {"valid": True, "errors": [], "node_count": len(mapping.nodes), "edge_count": len(mapping.edges)}
 
 
+# pydantic prefixes messages raised from a validator's ValueError/AssertionError; strip the noise.
+_PYDANTIC_PREFIXES = ("Value error, ", "Assertion error, ")
+
+
+def _format_loc(loc: tuple[Any, ...]) -> str:
+    """Render a pydantic error location compactly: ('nodes', 0, 'label') -> 'nodes[0].label'."""
+    out = ""
+    for part in loc:
+        out += f"[{part}]" if isinstance(part, int) else (f".{part}" if out else str(part))
+    return out
+
+
+def _format_validation_errors(exc: ValidationError) -> list[str]:
+    """Human-readable mapping-validation errors for the UI.
+
+    Drops pydantic's ``Value error,`` prefix and, for model-level validators (empty
+    ``loc``), the otherwise-leading ``": "`` — so an edge-reference failure reads
+    ``Edge 'X' references undefined source_node 'Y'`` rather than
+    ``: Value error, Edge 'X' references…``. Field errors keep a compact location.
+    """
+    msgs: list[str] = []
+    for err in exc.errors():
+        msg = err["msg"]
+        for prefix in _PYDANTIC_PREFIXES:
+            if msg.startswith(prefix):
+                msg = msg[len(prefix) :]
+                break
+        loc = _format_loc(err["loc"])
+        msgs.append(f"{loc}: {msg}" if loc else msg)
+    return msgs
+
+
 @router.post("/detect-features")
-def detect(body: SqlBody) -> dict[str, list[str]]:
-    """The same SQL feature detection the translator runs internally."""
+def detect(body: SqlBody) -> dict[str, Any]:
+    """The same SQL analysis the translator runs internally.
+
+    Returns the detected features plus ``parse_ok`` so the UI can show a live
+    "couldn't parse — will translate anyway" warning as the user types (the
+    translator's default ``parse_error_action`` is ``warn``).
+    """
     if not body.sql.strip():
-        return {"features": []}
-    features = detect_features(body.sql)
-    return {"features": sorted(f.value for f in features)}
+        return {"features": [], "parse_ok": True}
+    analysis = analyze_sql(body.sql)
+    return {"features": sorted(f.value for f in analysis.features), "parse_ok": analysis.parse_ok}
+
+
+@router.post("/check-coverage")
+def check_coverage(body: CoverageBody) -> dict[str, Any]:
+    """Live pre-flight: which SQL tables/columns are absent from the mapping.
+
+    Mirrors the translator's unmapped-tables (reject by default) and
+    unmapped-columns (warn by default) checks so the UI can flag the problem
+    before the user clicks Translate. Fails soft: an empty/unparseable SQL or an
+    invalid mapping yields empty lists (the mapping editor's own
+    ``/validate-mapping`` indicator reports YAML errors).
+    """
+    if not body.sql.strip():
+        return {"unmapped_tables": [], "unmapped_columns": [], "parse_ok": True}
+    analysis = analyze_sql(body.sql)
+    if not analysis.parse_ok:
+        return {"unmapped_tables": [], "unmapped_columns": [], "parse_ok": False}
+    try:
+        mapping = SchemaMapping.from_yaml_string(body.mapping_yaml)
+    except (yaml.YAMLError, ValidationError):
+        return {"unmapped_tables": [], "unmapped_columns": [], "parse_ok": True}
+    return {
+        "unmapped_tables": find_unmapped_tables(analysis.source_tables, mapping),
+        "unmapped_columns": find_unmapped_columns(analysis.column_refs, mapping),
+        "parse_ok": True,
+    }
 
 
 @router.post("/translate")

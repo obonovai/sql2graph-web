@@ -4,7 +4,7 @@
 // className helper. Nothing here reads the store.
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { useState } from "react";
-import { AlertTriangle, Check, ChevronDown, ChevronUp, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, X, XCircle } from "lucide-react";
 import * as RSelect from "@radix-ui/react-select";
 
 export function cls(...parts: (string | false | null | undefined)[]): string {
@@ -342,5 +342,42 @@ export function StatusText({ tone, children }: { tone: StatusTone; children: Rea
       {tone === "running" && <Spinner />}
       {children}
     </span>
+  );
+}
+
+// A single colored alert strip (icon + one line per message + optional muted note),
+// used uniformly for every error/warning banner in the app — the SQL pre-flight
+// banner, the schema-mapping validation errors, and the result-panel outcomes.
+type IssueTone = "error" | "warning";
+
+const ISSUE_TONES: Record<IssueTone, { wrap: string; note: string }> = {
+  error: {
+    wrap: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300",
+    note: "text-rose-500 dark:text-rose-400",
+  },
+  warning: {
+    wrap: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300",
+    note: "text-amber-600 dark:text-amber-400",
+  },
+};
+
+export function IssueStrip({ tone, lines, note }: { tone: IssueTone; lines: string[]; note?: string }) {
+  const t = ISSUE_TONES[tone];
+  const Icon = tone === "error" ? XCircle : AlertTriangle;
+  return (
+    <div
+      className={cls(
+        "flex max-h-28 shrink-0 items-start gap-1.5 overflow-y-auto border-t px-3 py-1.5 text-[11px]",
+        t.wrap,
+      )}
+    >
+      <Icon className="mt-px h-3.5 w-3.5 shrink-0" />
+      <div className="min-w-0">
+        {lines.map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
+        {note && <div className={t.note}>{note}</div>}
+      </div>
+    </div>
   );
 }

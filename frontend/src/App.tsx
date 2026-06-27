@@ -16,6 +16,7 @@ import { ChatSidebar } from "@/components/ChatSidebar";
 import { Section } from "@/components/ui/primitives";
 import { useMappingValidation } from "@/hooks/useMappingValidation";
 import { useFeatureDetection } from "@/hooks/useFeatureDetection";
+import { useTableCoverage } from "@/hooks/useTableCoverage";
 
 function CollapsedChatRail() {
   const status = useStore((s) => s.stream.status);
@@ -44,9 +45,10 @@ export default function App() {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  // Debounced live mapping validation + SQL feature detection.
+  // Debounced live mapping validation + SQL feature detection + table coverage.
   useMappingValidation();
   useFeatureDetection();
+  useTableCoverage();
 
   return (
     <div className="flex h-full w-full flex-col bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-100">

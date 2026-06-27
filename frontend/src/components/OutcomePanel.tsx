@@ -1,7 +1,7 @@
 import { Copy, Download } from "lucide-react";
 import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";
 import { CodeEditor } from "@/components/ui/CodeEditor";
-import { Chip, FooterBar, IconButton, PaneHeader, StatusText } from "@/components/ui/primitives";
+import { Chip, FooterBar, IconButton, IssueStrip, PaneHeader, StatusText } from "@/components/ui/primitives";
 
 const FILE_EXT: Record<string, string> = { cypher: "cypher", aql: "aql", gremlin: "groovy" };
 
@@ -25,6 +25,13 @@ export function OutcomePanel() {
   const tokens = useStore((s) => s.stream.tokenUsage);
   const errorMessage = useStore((s) => s.stream.errorMessage);
   const stalled = useStore((s) => s.stream.stalled);
+  // Input pre-flight problems (parse / unmapped tables / unmapped columns) are
+  // surfaced live in the SQL window and gate the Translate button, so they are
+  // NOT repeated here. These flags only label the outcome status (and suppress
+  // the validation-error banner) on the rare debounce race where a reject still
+  // reaches translate().
+  const rejectedUnmapped = finalStatus === "unmapped_tables";
+  const rejectedColumns = finalStatus === "unmapped_columns";
 
   const copy = () => generated && navigator.clipboard?.writeText(generated);
   const download = () => {
@@ -79,15 +86,10 @@ export function OutcomePanel() {
         )}
       </div>
 
-      {passed === false && errors.length > 0 && (
-        <div className="max-h-28 shrink-0 overflow-y-auto border-t border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
-          <div className="mb-0.5 font-semibold">Validation errors</div>
-          <ul>
-            {errors.map((e, i) => (
-              <li key={i}>• {e}</li>
-            ))}
-          </ul>
-        </div>
+      {/* Output-side problems only. Input rejects (handled in the SQL window) are
+          suppressed here; the footer status still labels them on the rare race. */}
+      {passed === false && errors.length > 0 && !rejectedUnmapped && !rejectedColumns && (
+        <IssueStrip tone="error" lines={errors} />
       )}
 
       {/* Process status → end-of-run outcome. Shared FooterBar + StatusText. */}
@@ -98,22 +100,31 @@ export function OutcomePanel() {
 
         {status === "error" && <StatusText tone="error">Error: {errorMessage ?? "translation failed"}</StatusText>}
 
-        {status === "done" && (
-          <>
-            {passed !== false ? (
-              <StatusText tone="success">success</StatusText>
-            ) : (
-              <StatusText tone={finalStatus === "stalled" ? "warn" : "error"}>
-                {finalStatus ?? "max_iterations_reached"}
-              </StatusText>
-            )}
-            <Chip>
-              {iters} iteration{iters === 1 ? "" : "s"}
-            </Chip>
-            <Chip>{(duration ?? 0).toFixed(2)}s</Chip>
-            {tokens && tokens.total_tokens > 0 && <Chip title={tokenTitle}>{tokens.total_tokens.toLocaleString()} tokens</Chip>}
-          </>
-        )}
+        {status === "done" &&
+          (rejectedUnmapped ? (
+            // Rejected before any LLM call — the table list carries the detail,
+            // so iteration/duration/token chips (all zero) would just be noise.
+            <StatusText tone="error">unmapped tables</StatusText>
+          ) : rejectedColumns ? (
+            <StatusText tone="error">unmapped columns</StatusText>
+          ) : (
+            <>
+              {passed !== false ? (
+                <StatusText tone="success">success</StatusText>
+              ) : (
+                <StatusText tone={finalStatus === "stalled" ? "warn" : "error"}>
+                  {finalStatus ?? "max_iterations_reached"}
+                </StatusText>
+              )}
+              <Chip>
+                {iters} iteration{iters === 1 ? "" : "s"}
+              </Chip>
+              <Chip>{(duration ?? 0).toFixed(2)}s</Chip>
+              {tokens && tokens.total_tokens > 0 && (
+                <Chip title={tokenTitle}>{tokens.total_tokens.toLocaleString()} tokens</Chip>
+              )}
+            </>
+          ))}
       </FooterBar>
     </div>
   );

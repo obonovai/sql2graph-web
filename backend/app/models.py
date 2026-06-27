@@ -77,3 +77,8 @@ class MappingBody(BaseModel):
 
 class SqlBody(BaseModel):
     sql: str
+
+
+class CoverageBody(BaseModel):
+    sql: str
+    mapping_yaml: str
