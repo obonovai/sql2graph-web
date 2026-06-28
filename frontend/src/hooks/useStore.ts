@@ -1,4 +1,4 @@
-// Central Zustand store — the single source of truth for all UI + run state.
+// Central Zustand store, the single source of truth for all UI + run state.
 // Owns the form, the live translation `stream` state, persistence (with a versioned
 // migration), the exported domain constants (RUNNING_STATUSES, SERVER_TYPE_BY_TARGET),
 // and the SSE→state reducer inside `translate()`. Components subscribe via selectors.
@@ -63,7 +63,7 @@ interface StreamState {
   stalled: boolean;
   // Pre-flight signals for this run: a parse-failure warning (translation still
   // proceeds), the unmapped tables that caused a rejection (LLM skipped), and the
-  // unmapped columns (a warning by default — translation still proceeds).
+  // unmapped columns (a warning by default, translation still proceeds).
   parseWarning: string | null;
   unmappedTables: string[] | null;
   unmappedColumns: string[] | null;
@@ -168,7 +168,7 @@ function modelDefault(options: Options | null, provider: Provider): string {
 }
 
 // Numeric Ollama defaults (num_ctx, repeat_penalty) likewise come from
-// config/models/ollama.yaml via /api/options — keep the YAML the single source
+// config/models/ollama.yaml via /api/options. Keep the YAML the single source
 // of truth. Returns null when the key is absent, which means "let the
 // library/Ollama default apply".
 function ollamaDefault(options: Options | null, key: string): number | null {
@@ -452,7 +452,7 @@ export const useStore = create<Store>()(
       name: "rows2graph-web",
       version: 1,
       // v0 persisted a `mappingOpen` flag (the schema-mapping drawer). The drawer
-      // is gone — mapping is now an input tab (`inputTab`) — so drop the stale key
+      // is gone, mapping is now an input tab (`inputTab`), so drop the stale key
       // while preserving the user's saved `form` (SQL + mapping). `inputTab` is
       // absent from old storage and falls back to its initial value.
       migrate: (persisted: unknown) => {

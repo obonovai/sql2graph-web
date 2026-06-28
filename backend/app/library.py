@@ -1,7 +1,7 @@
 """Adapters: turn request JSON into rows2graph's own objects and components.
 
 This is the only place that touches the library. It mirrors
-``demo/cli.py:main()`` — same factories, same wiring — but builds inputs from the
+``demo/cli.py:main()`` (same factories, same wiring) but builds inputs from the
 HTTP request instead of argparse + YAML files.
 """
 
@@ -110,7 +110,7 @@ def _server_is_empty(sc: ServerSettings) -> bool:
 
 def build_translator(req: TranslateRequest) -> tuple[AsyncSQLTranslator, str]:
     """Construct the translator from the request, returning it plus the effective
-    validation mode (``server`` with an empty config resolves to ``managed`` —
+    validation mode (``server`` with an empty config resolves to ``managed``,
     the same rule demo/cli.py applies)."""
     mapping = SchemaMapping.from_yaml_string(req.mapping_yaml)
     model_cfg = build_model_config(req.llm)

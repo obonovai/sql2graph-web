@@ -22,7 +22,7 @@ docker = ["docker>=7"]
 [tool.uv.sources]
 rows2graph = { path = "../../rows2graph", editable = true }
 
-# This backend is an application, not a distributable package — no build step.
+# This backend is an application, not a distributable package: no build step.
 [tool.uv]
 package = false
 

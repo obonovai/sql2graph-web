@@ -1,7 +1,7 @@
 // Live, as-you-type pre-flight banner for the SQL editor. Two severities via the
 // shared <IssueStrip>:
-//   · warning (amber) — the SQL won't parse, but is still sent to the model.
-//   · error   (rose)  — the SQL reads tables, or names columns of a mapped table,
+//   · warning (amber): the SQL won't parse, but is still sent to the model.
+//   · error   (rose):  the SQL reads tables, or names columns of a mapped table,
 //                       absent from the mapping; translation would be rejected.
 // Renders nothing when the query is clean. The neutral "Detected features" chips
 // live in <FeatureChips /> below this; the two are deliberately not mixed.
@@ -22,7 +22,7 @@ export function SqlPreflightBanner() {
 
   return (
     <div className="shrink-0">
-      {!sqlParseOk && <IssueStrip tone="warning" lines={["SQL won't parse — it will still be sent to the model."]} />}
+      {!sqlParseOk && <IssueStrip tone="warning" lines={["SQL won't parse; it will still be sent to the model."]} />}
       {rejects.length > 0 && <IssueStrip tone="error" lines={rejects}/>}
     </div>
   );

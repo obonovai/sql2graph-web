@@ -6,9 +6,9 @@ import { Chip, FooterBar, IconButton, IssueStrip, PaneHeader, StatusText } from 
 const FILE_EXT: Record<string, string> = { cypher: "cypher", aql: "aql", gremlin: "groovy" };
 
 // Result pane:
-//  · header — the target language (left) + copy / download (right)
-//  · body   — the generated query (read-only) or a placeholder
-//  · footer — the live process status (db setup, LLM calls, validation) that
+//  · header: the target language (left) + copy / download (right)
+//  · body:   the generated query (read-only) or a placeholder
+//  · footer: the live process status (db setup, LLM calls, validation) that
 //             resolves, at the end, into the outcome badges (verdict + iterations
 //             + duration + tokens).
 export function OutcomePanel() {
@@ -54,7 +54,7 @@ export function OutcomePanel() {
 
   const runningLabel =
     status === "provisioning"
-      ? "Setting up database… (first run can take 10–40s)"
+      ? "Setting up database… (first run can take 10-40s)"
       : status === "generating"
         ? "Generating query…"
         : status === "validating"
@@ -102,7 +102,7 @@ export function OutcomePanel() {
 
         {status === "done" &&
           (rejectedUnmapped ? (
-            // Rejected before any LLM call — the table list carries the detail,
+            // Rejected before any LLM call: the table list carries the detail,
             // so iteration/duration/token chips (all zero) would just be noise.
             <StatusText tone="error">unmapped tables</StatusText>
           ) : rejectedColumns ? (

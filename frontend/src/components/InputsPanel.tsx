@@ -29,7 +29,7 @@ function Tab({ active, onClick, children }: { active: boolean; onClick: () => vo
 }
 
 // The two primary inputs (schema mapping + SQL) as co-equal tabs. Both bodies stay
-// mounted and toggle with the `hidden` class — never conditional render — so each
+// mounted and toggle with the `hidden` class (never conditional render) so each
 // CodeMirror keeps its cursor/scroll and is not torn down on every tab switch.
 export function InputsPanel() {
   const tab = useStore((s) => s.inputTab);
@@ -124,7 +124,7 @@ export function InputsPanel() {
         {validity && !validity.valid && validity.errors.length > 0 && (
           <IssueStrip tone="error" lines={validity.errors} />
         )}
-        {/* Validity footer — shared FooterBar + StatusText. */}
+        {/* Validity footer: shared FooterBar + StatusText. */}
         <FooterBar>
           {validity == null ? (
             <StatusText tone="muted">No mapping yet.</StatusText>

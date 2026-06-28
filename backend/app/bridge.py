@@ -10,7 +10,7 @@ same event-loop task that runs ``translate()`` (see
   so we coalesce them: the callback just stores the latest snapshot and a timer
   flushes at most one ``conversation`` event per tick.
 
-We rely on ``on_conversation`` alone for the live transcript — it already carries
+We rely on ``on_conversation`` alone for the live transcript: it already carries
 the growing assistant text token-by-token, so ``stream_to`` is unnecessary.
 
 Lifecycle: the translator runs inside ``async with`` so its LLM client, DB

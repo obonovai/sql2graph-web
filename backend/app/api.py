@@ -55,7 +55,7 @@ def _docker_available() -> bool:
         client.ping()
         return True
     except Exception:  # noqa: BLE001
-        logger.info("Docker not available — empty-config 'server' validation will be disabled in the UI.")
+        logger.info("Docker not available: empty-config 'server' validation will be disabled in the UI.")
         return False
 
 
@@ -129,7 +129,7 @@ def _format_validation_errors(exc: ValidationError) -> list[str]:
     """Human-readable mapping-validation errors for the UI.
 
     Drops pydantic's ``Value error,`` prefix and, for model-level validators (empty
-    ``loc``), the otherwise-leading ``": "`` — so an edge-reference failure reads
+    ``loc``), the otherwise-leading ``": "``, so an edge-reference failure reads
     ``Edge 'X' references undefined source_node 'Y'`` rather than
     ``: Value error, Edge 'X' references…``. Field errors keep a compact location.
     """
@@ -150,7 +150,7 @@ def detect(body: SqlBody) -> dict[str, Any]:
     """The same SQL analysis the translator runs internally.
 
     Returns the detected features plus ``parse_ok`` so the UI can show a live
-    "couldn't parse — will translate anyway" warning as the user types (the
+    "couldn't parse, will translate anyway" warning as the user types (the
     translator's default ``parse_error_action`` is ``warn``).
     """
     if not body.sql.strip():

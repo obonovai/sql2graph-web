@@ -4,7 +4,7 @@ A small FastAPI app that exposes the [`rows2graph`](../../rows2graph) library to
 browser. It is a **thin wrapper**: it converts the web request into the library's
 own config objects, runs `AsyncSQLTranslator.translate(...)`, and streams the
 result to the frontend as Server-Sent Events. It adds no translation logic of its
-own — the same wiring `rows2graph/demo/cli.py` uses, driven by an HTTP request
+own: the same wiring `rows2graph/demo/cli.py` uses, driven by an HTTP request
 instead of argparse + files.
 
 For prerequisites, running, validation modes, configuration, and the endpoint
@@ -15,8 +15,8 @@ table, see the [top-level README](../README.md).
 | Module | Responsibility |
 |---|---|
 | `main.py` | FastAPI app: logging (silences noisy graph-DB drivers), dev CORS for `:5173`, mounts the API router, and serves the built SPA from `frontend/dist/` when present (same origin). |
-| `api.py` | The HTTP surface — `APIRouter(prefix="/api")` with the `health` / `options` / `presets` / `validate-mapping` / `detect-features` / `translate` routes. Surfaces config errors as `400` before any stream starts. |
-| `bridge.py` | The SSE bridge — see below. |
+| `api.py` | The HTTP surface: `APIRouter(prefix="/api")` with the `health` / `options` / `presets` / `validate-mapping` / `detect-features` / `translate` routes. Surfaces config errors as `400` before any stream starts. |
+| `bridge.py` | The SSE bridge: see below. |
 | `library.py` | The **only** module that touches the library: builds the `SchemaMapping`, model config, and (optional) server config from the request, and assembles the translator. Resolves `server` mode with an empty connection to `managed` (throwaway DB). |
 | `models.py` | Pydantic request models (`TranslateRequest`, `LlmSettings`, `ServerSettings`, `ValidationSettings`, …). Their shapes mirror `frontend/src/lib/types.ts`. |
 | `presets.py` | Reads the library's `config/` dir for the bundled mapping presets and the per-provider model defaults, so the UI's defaults always match the library. |

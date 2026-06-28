@@ -1,6 +1,6 @@
 // Root component and overall workbench layout: a collapsible Settings sidebar, the
 // center column (Header → Run-setup bar → Inputs │ Result split), and a collapsible
-// live Chat sidebar — plus the app-level effects (store init, the dark-mode class,
+// live Chat sidebar, plus the app-level effects (store init, the dark-mode class,
 // and the debounced mapping-validation / feature-detection hooks).
 import { useEffect } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";

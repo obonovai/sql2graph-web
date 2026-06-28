@@ -2,7 +2,7 @@
 
 A Vite + React + TypeScript single-page app. It talks to the FastAPI backend over
 the `/api` proxy (REST + a Server-Sent-Events stream) and renders the SQL → graph
-translation workbench. No translation logic lives here — the frontend is pure UI +
+translation workbench. No translation logic lives here; the frontend is pure UI +
 state.
 
 For running/building and the backend, see the [top-level README](../README.md).
@@ -11,7 +11,7 @@ For running/building and the backend, see the [top-level README](../README.md).
 
 ```
 src/
-  main.tsx              React entry — mounts <App>
+  main.tsx              React entry, mounts <App>
   App.tsx               Workbench layout + app-level effects
   index.css             Tailwind entry + a few globals
   lib/                  Framework-agnostic logic + types
@@ -44,11 +44,11 @@ store-connected feature components.
 `hooks/useStore.ts` (Zustand) is the **single source of truth**. Components read it
 through selectors (`useStore(s => s.…)`); there is no prop-drilling.
 
-- **`form`** — everything the user configures (target, LLM settings, validation
+- **`form`**: everything the user configures (target, LLM settings, validation
   settings, mapping YAML, SQL). Persisted to `localStorage` (see below).
-- **`stream`** — the live state of the current translation run (status, the latest
+- **`stream`**: the live state of the current translation run (status, the latest
   generated query, validation result, iteration counters, token usage, errors).
-- **Actions** — `init()` (load `/api/options`), the `setX` setters, the debounced
+- **Actions**: `init()` (load `/api/options`), the `setX` setters, the debounced
   `refreshMappingValidity()` / `refreshFeatures()`, and `translate()` / `stop()` /
   `clearWorkspace()`.
 
@@ -67,7 +67,7 @@ the shared definition of "a run is in flight".
 
 **Debounced side-effects.** `useMappingValidation` and `useFeatureDetection`
 (called once in `App.tsx`) watch `form.mappingYaml` / `form.sql` and, 400 ms after
-the last edit, call `/api/validate-mapping` / `/api/detect-features` — driving the
+the last edit, call `/api/validate-mapping` / `/api/detect-features`, driving the
 mapping validity footer and the detected-feature chips.
 
 **Persistence.** Zustand `persist` saves `{ theme, leftOpen, rightOpen, inputTab,
@@ -78,7 +78,7 @@ drops the obsolete `mappingOpen` flag while preserving the user's saved `form`.
 
 - **`@/` import alias** → `src/` (configured in `tsconfig.json` `paths` +
   `vite.config.ts` `resolve.alias`). Import as `@/lib/api`, `@/hooks/useStore`,
-  `@/components/ui/primitives` — never deep `../../` paths.
+  `@/components/ui/primitives`; never deep `../../` paths.
 - **Design system** lives in `components/ui/primitives.tsx`. Reuse it; in particular
   `PaneHeader` (fixed `h-9` pane headers), `FooterBar` (the shared `h-9` pane
   footer), and `StatusText` (one icon+color vocabulary for success / error / warn /

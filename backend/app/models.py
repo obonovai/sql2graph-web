@@ -1,7 +1,7 @@
 """Pydantic request models for the web UI.
 
 These mirror the shape of the sidebar/main-area form. The backend converts them
-into the rows2graph library's own config objects in :mod:`app.library` — it adds
+into the rows2graph library's own config objects in :mod:`app.library`; it adds
 no translation logic of its own.
 """
 
@@ -35,7 +35,7 @@ class LlmSettings(BaseModel):
     repeat_penalty: float | None = None  # >1.0 discourages the degenerate repeat loop
     # Anthropic only:
     max_output_tokens: int | None = None
-    # api_key is intentionally absent — the Anthropic SDK reads ANTHROPIC_API_KEY
+    # api_key is intentionally absent: the Anthropic SDK reads ANTHROPIC_API_KEY
     # from the backend environment.
 
 

@@ -1,6 +1,6 @@
 # rows2graph-web
 
-A simple, hand-owned web UI that wraps the [`rows2graph`](../rows2graph) library — translate
+A simple, hand-owned web UI that wraps the [`rows2graph`](../rows2graph) library: translate
 SQL into Cypher / AQL / Gremlin through a browser, no Python required. It is a thin wrapper: the
 backend calls the same public library API that `rows2graph/demo/cli.py` uses and adds no
 translation logic of its own.
@@ -23,7 +23,7 @@ translation logic of its own.
   per token and resend the whole transcript) are coalesced to ~12 fps; the translator runs inside
   `async with` so the LLM client, DB connections, and any throwaway managed DB are torn down on
   completion or client disconnect. See **[`backend/README.md`](backend/README.md)**.
-- **Frontend** (`frontend/`, Vite + React + TS): a three-column shell — collapsible Settings
+- **Frontend** (`frontend/`, Vite + React + TS): a three-column shell, collapsible Settings
   sidebar · center workbench · collapsible live Chat sidebar. The center stacks a Header, a
   Run-setup bar (target + Translate), and a resizable **Inputs ∥ Result** split: the inputs pane
   carries the schema mapping (YAML) and SQL as co-equal tabs, the result pane shows the generated
@@ -34,10 +34,10 @@ translation logic of its own.
 
 - The `rows2graph` library sibling repo (this app installs it editable from `../rows2graph`).
 - An LLM backend:
-  - **Anthropic** — export `ANTHROPIC_API_KEY` for the backend (the key is never entered in the
+  - **Anthropic**: export `ANTHROPIC_API_KEY` for the backend (the key is never entered in the
     browser).
-  - **Ollama** — running locally or via `OLLAMA_HOST` (e.g. an SSH tunnel); pull the model you select.
-- **Docker** (optional) — only for `server` validation with an empty connection (auto-provisions a
+  - **Ollama**: running locally or via `OLLAMA_HOST` (e.g. an SSH tunnel); pull the model you select.
+- **Docker** (optional): only for `server` validation with an empty connection (auto-provisions a
   throwaway Neo4j / ArangoDB / Gremlin via testcontainers).
 
 ## Run (development)
@@ -70,17 +70,17 @@ When `frontend/dist/` exists the backend serves the SPA from `/` (same origin, n
 
 ## Validation modes
 
-- `none` — single shot, no checks.
-- `syntax` — fast regex sanity checks, no database.
-- `server` — validate each candidate against a graph DB. Fill in the connection to use **your**
+- `none`: single shot, no checks.
+- `syntax`: fast regex sanity checks, no database.
+- `server`: validate each candidate against a graph DB. Fill in the connection to use **your**
   database, or leave it empty to auto-provision a **throwaway** one via Docker. The DB is reached
-  from the **backend** host — "localhost" means the server's localhost.
+  from the **backend** host: "localhost" means the server's localhost.
 
 ## Configuration
 
-- `OLLAMA_HOST` — default Ollama endpoint when the sidebar host override is blank.
-- `ANTHROPIC_API_KEY` — read by the Anthropic SDK on the backend.
-- `ROWS2GRAPH_CONFIG_DIR` — override the library `config/` dir used for preset mappings
+- `OLLAMA_HOST`: default Ollama endpoint when the sidebar host override is blank.
+- `ANTHROPIC_API_KEY`: read by the Anthropic SDK on the backend.
+- `ROWS2GRAPH_CONFIG_DIR`: override the library `config/` dir used for preset mappings
   (`mappings/`) and the model-field defaults (`models/`); defaults to `../rows2graph/config`.
 
 ## API
@@ -89,7 +89,7 @@ When `frontend/dist/` exists the backend serves the SPA from `/` (same origin, n
 |---|---|---|
 | GET | `/api/health` | Liveness. |
 | GET | `/api/options` | Enums + library defaults + Docker availability for the forms. |
-| GET | `/api/presets` | Bundled tpch/ldbc mappings + sample SQL (backend only — the current UI doesn't auto-load them). |
+| GET | `/api/presets` | Bundled tpch/ldbc mappings + sample SQL (backend only: the current UI doesn't auto-load them). |
 | POST | `/api/validate-mapping` | Validate a mapping YAML string (`{valid, errors, node_count, edge_count}`). |
 | POST | `/api/detect-features` | The SQL features the translator detects (for the chips). |
 | POST | `/api/translate` | SSE stream: `status`/`conversation`/`generated`/`validated`/`fix`/`max_iterations`/`completed`/`error`. |

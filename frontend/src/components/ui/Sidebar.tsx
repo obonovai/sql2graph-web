@@ -1,4 +1,4 @@
-// CollapsibleSidebar: the collapsible left/right rail shell — a titled panel when
+// CollapsibleSidebar: the collapsible left/right rail shell, a titled panel when
 // open, or a narrow rail (vertical title + optional status indicator) when collapsed.
 import type { ReactNode } from "react";
 import { IconButton, cls } from "@/components/ui/primitives";

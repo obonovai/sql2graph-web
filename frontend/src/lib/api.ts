@@ -1,6 +1,6 @@
 // Typed client for the FastAPI backend: small REST helpers (options,
 // validate-mapping, detect-features) and the `translate` Server-Sent-Events stream
-// that the store consumes. Adds no logic of its own — just fetch + typing.
+// that the store consumes. Adds no logic of its own, just fetch + typing.
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import type {
   CoverageCheck,
@@ -71,7 +71,7 @@ export function translateStream(
     openWhenHidden: true,
     async onopen(res) {
       if (res.ok && res.headers.get("content-type")?.includes("text/event-stream")) return;
-      // Non-stream response (e.g. 400 with a JSON detail) — surface it and stop.
+      // Non-stream response (e.g. 400 with a JSON detail): surface it and stop.
       let detail = `HTTP ${res.status}`;
       try {
         const body = await res.json();
@@ -96,7 +96,7 @@ export function translateStream(
       throw err;
     },
   }).catch((err) => {
-    if (handlers.signal.aborted) return; // user pressed Stop — not an error
+    if (handlers.signal.aborted) return; // user pressed Stop, not an error
     if (err instanceof FatalSseError) handlers.onError(err.message);
   });
 }

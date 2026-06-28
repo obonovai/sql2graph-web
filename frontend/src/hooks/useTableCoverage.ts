@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useStore } from "@/hooks/useStore";
 
-// Debounced live check of which SQL tables are absent from the schema mapping —
+// Debounced live check of which SQL tables are absent from the schema mapping,
 // fires 400ms after the last edit to *either* the SQL or the mapping (the check
 // depends on both) and pushes the result into `coverageUnmapped`.
 export function useTableCoverage() {

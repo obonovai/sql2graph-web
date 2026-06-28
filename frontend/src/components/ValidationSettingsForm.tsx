@@ -109,8 +109,8 @@ export function ValidationSettingsForm() {
               }
             >
               {dockerAvailable
-                ? "Empty config → a throwaway database is auto-provisioned via Docker on the backend (first run takes 10–40s)."
-                : "Empty config needs Docker on the backend — none detected. Fill in a connection or pick another mode."}
+                ? "Empty config → a throwaway database is auto-provisioned via Docker on the backend (first run takes 10-40s)."
+                : "Empty config needs Docker on the backend; none detected. Fill in a connection or pick another mode."}
             </p>
           )}
         </div>

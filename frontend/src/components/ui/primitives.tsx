@@ -150,7 +150,7 @@ export interface SelectOption {
 
 // Radix-based select so the option list always drops down *below* the trigger
 // (rendered in a portal, so the sidebar's scroll never clips it). Option values
-// must be non-empty (a Radix constraint) — use a sentinel for an "empty" choice.
+// must be non-empty (a Radix constraint). Use a sentinel for an "empty" choice.
 export function Select({
   value,
   onChange,
@@ -265,7 +265,7 @@ export function Chip({
   );
 }
 
-// Fixed-height (h-9) header for an editor pane. The fixed height — not padding —
+// Fixed-height (h-9) header for an editor pane. The fixed height (not padding)
 // is what keeps two side-by-side panes aligned whether or not they carry an
 // action in the right-hand `children` slot.
 export function PaneHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
@@ -308,7 +308,7 @@ export function Spinner({ className }: { className?: string }) {
   );
 }
 
-// The shared h-9 footer bar at the bottom of every workbench pane — single source
+// The shared h-9 footer bar at the bottom of every workbench pane, single source
 // of truth so the mapping / SQL / result footers can't drift apart again.
 export function FooterBar({ children }: { children: ReactNode }) {
   return (
@@ -346,7 +346,7 @@ export function StatusText({ tone, children }: { tone: StatusTone; children: Rea
 }
 
 // A single colored alert strip (icon + one line per message + optional muted note),
-// used uniformly for every error/warning banner in the app — the SQL pre-flight
+// used uniformly for every error/warning banner in the app, the SQL pre-flight
 // banner, the schema-mapping validation errors, and the result-panel outcomes.
 type IssueTone = "error" | "warning";
 

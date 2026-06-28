@@ -1,4 +1,4 @@
-// SQL footer: the detected-feature chips — which SQL features the translator found
+// SQL footer: the detected-feature chips, which SQL features the translator found
 // in the query (these tailor/trim the prompt sent to the model). Hidden when empty.
 // Pre-flight *problems* (won't parse / unmapped tables / unmapped columns) are a
 // separate concern and render in <SqlPreflightBanner /> above this footer.
@@ -12,7 +12,7 @@ export function FeatureChips() {
     <FooterBar>
       <span
         className="text-xs font-medium text-slate-400"
-        title="Detected from your SQL — these tailor (and trim) the prompt sent to the model, so it only sees the rules your query needs."
+        title="Detected from your SQL: these tailor (and trim) the prompt sent to the model, so it only sees the rules your query needs."
       >
         Detected features:
       </span>
