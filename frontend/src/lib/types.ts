@@ -86,6 +86,7 @@ export interface Options {
   providers: Provider[];
   targets: Target[];
   validation_modes: ValidationMode[];
+  validation_modes_by_target: Record<Target, ValidationMode[]>;
   defaults: {
     anthropic: Record<string, unknown>;
     ollama: Record<string, unknown>;

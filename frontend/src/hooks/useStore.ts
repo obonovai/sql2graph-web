@@ -120,6 +120,14 @@ export const SERVER_TYPE_BY_TARGET: Record<Target, ServerType> = {
   gremlin: "gremlin",
 };
 
+// Validation modes available per target, sourced from /api/options (which the
+// backend derives from the library's valid_modes_for_target; AQL has no
+// in-process "syntax" validator). Falls back to the full set before options
+// load and against an older backend that doesn't send the per-target map.
+export function modesForTarget(options: Options | null, target: Target): ValidationMode[] {
+  return options?.validation_modes_by_target?.[target] ?? ["none", "syntax", "server"];
+}
+
 interface Store {
   options: Options | null;
   theme: "light" | "dark";
@@ -242,6 +250,10 @@ export const useStore = create<Store>()(
           if (llm.repeat_penalty == null) patch.repeat_penalty = ollamaDefault(options, "repeat_penalty");
           if (llm.num_ctx == null) patch.num_ctx = ollamaDefault(options, "num_ctx");
           if (Object.keys(patch).length > 0) get().setLlm(patch);
+          // Clamp a now-invalid persisted mode (e.g. a pre-change aql + syntax).
+          const { target, validation } = get().form;
+          const allowed = modesForTarget(get().options, target);
+          if (!allowed.includes(validation.mode)) get().setValidationMode(allowed[0]);
         } catch (e) {
           console.error("Failed to load options", e);
         }
@@ -253,7 +265,14 @@ export const useStore = create<Store>()(
       setRightOpen: (b) => set({ rightOpen: b }),
       setInputTab: (t) => set({ inputTab: t }),
 
-      setTarget: (t) => set((s) => ({ form: { ...s.form, target: t } })),
+      setTarget: (t) =>
+        set((s) => {
+          // Clamp the validation mode to one valid for the new target (e.g. AQL
+          // has no "syntax"). Mirrors setProvider resetting the model on change.
+          const allowed = modesForTarget(s.options, t);
+          const mode = allowed.includes(s.form.validation.mode) ? s.form.validation.mode : allowed[0];
+          return { form: { ...s.form, target: t, validation: { ...s.form.validation, mode } } };
+        }),
       setProvider: (p) =>
         set((s) => ({ form: { ...s.form, llm: { ...s.form.llm, provider: p, model: modelDefault(s.options, p) } } })),
       setLlm: (patch) => set((s) => ({ form: { ...s.form, llm: { ...s.form.llm, ...patch } } })),

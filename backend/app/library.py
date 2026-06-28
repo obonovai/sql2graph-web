@@ -22,6 +22,7 @@ from rows2graph import (
     make_async_validator,
     make_target,
     resolve_validation_mode,
+    valid_modes_for_target,
 )
 
 from .models import LlmSettings, ServerSettings, TranslateRequest
@@ -112,6 +113,13 @@ def build_translator(req: TranslateRequest) -> tuple[AsyncSQLTranslator, str]:
     """Construct the translator from the request, returning it plus the effective
     validation mode (``server`` with an empty config resolves to ``managed``,
     the same rule demo/cli.py applies)."""
+    if req.validation.mode not in valid_modes_for_target(req.target):
+        allowed = ", ".join(valid_modes_for_target(req.target))
+        raise ValueError(
+            f"Validation mode '{req.validation.mode}' is not available for target "
+            f"'{req.target}' (available: {allowed}). AQL has no deployment-free "
+            f"syntax validator; use 'server'."
+        )
     mapping = SchemaMapping.from_yaml_string(req.mapping_yaml)
     model_cfg = build_model_config(req.llm)
 

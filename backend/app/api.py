@@ -20,6 +20,7 @@ from rows2graph import (
     Neo4jConfig,
     SchemaMapping,
     analyze_sql,
+    valid_modes_for_target,
 )
 from rows2graph.preflight import find_unmapped_columns, find_unmapped_tables
 from sse_starlette.sse import EventSourceResponse
@@ -74,6 +75,9 @@ def options() -> dict[str, Any]:
         "providers": list(VALID_PROVIDERS),
         "targets": list(VALID_TARGETS),
         "validation_modes": list(VALID_VALIDATION_MODES),
+        # Per-target allowed modes (AQL has no deployment-free 'syntax' validator).
+        # The frontend uses this to offer only valid modes for the chosen target.
+        "validation_modes_by_target": {t: list(valid_modes_for_target(t)) for t in VALID_TARGETS},
         "defaults": {
             "anthropic": model_defaults["anthropic"],
             "ollama": model_defaults["ollama"],

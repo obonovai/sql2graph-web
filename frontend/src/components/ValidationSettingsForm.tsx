@@ -1,4 +1,4 @@
-import { SERVER_TYPE_BY_TARGET, useStore } from "@/hooks/useStore";
+import { SERVER_TYPE_BY_TARGET, modesForTarget, useStore } from "@/hooks/useStore";
 import { Field, NumberValueInput, Select, TextInput } from "@/components/ui/primitives";
 
 // Home of the run's validation config: mode, the connection details that only
@@ -11,8 +11,10 @@ export function ValidationSettingsForm() {
   const setMaxIterations = useStore((st) => st.setMaxIterations);
   const setServer = useStore((st) => st.setServer);
   const dockerAvailable = useStore((st) => st.options?.docker_available ?? true);
+  const options = useStore((st) => st.options);
 
   const serverType = SERVER_TYPE_BY_TARGET[target];
+  const modes = modesForTarget(options, target);
   const s = validation.server;
   const primaryFilled = (serverType === "neo4j" ? s.uri : s.url).trim().length > 0;
 
@@ -22,12 +24,13 @@ export function ValidationSettingsForm() {
         <Select
           value={validation.mode}
           onChange={(v) => setValidationMode(v as never)}
-          options={[
-            { value: "none", label: "none" },
-            { value: "syntax", label: "syntax" },
-            { value: "server", label: "server" },
-          ]}
+          options={modes.map((m) => ({ value: m, label: m }))}
         />
+        {target === "aql" && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            AQL has no in-process syntax check; use <code>server</code> validation.
+          </p>
+        )}
       </Field>
 
       {validation.mode === "server" && (
