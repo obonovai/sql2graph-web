@@ -1,5 +1,5 @@
 {
-  "name": "rows2graph-web-frontend",
+  "name": "sql2graph-web-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -13,8 +13,11 @@
     "@codemirror/lang-sql": "^6.8.0",
     "@codemirror/lang-yaml": "^6.1.1",
     "@microsoft/fetch-event-source": "^2.0.1",
+    "@radix-ui/react-dialog": "^1.1.17",
     "@radix-ui/react-select": "^2.3.1",
     "@uiw/react-codemirror": "^4.23.0",
+    "cytoscape": "^3.34.0",
+    "cytoscape-fcose": "^2.2.0",
     "lucide-react": "^1.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -23,6 +26,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.1",
+    "@types/cytoscape": "^3.21.9",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.0.3",

@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 for _noisy in ("neo4j", "gremlinpython"):
     logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 
-app = FastAPI(title="rows2graph-web", version="0.1.0")
+app = FastAPI(title="sql2graph-web", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,

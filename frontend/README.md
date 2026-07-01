@@ -1,4 +1,4 @@
-# rows2graph-web · frontend
+# sql2graph-web · frontend
 
 A Vite + React + TypeScript single-page app. It talks to the FastAPI backend over
 the `/api` proxy (REST + a Server-Sent-Events stream) and renders the SQL → graph
@@ -71,7 +71,7 @@ the last edit, call `/api/validate-mapping` / `/api/detect-features`, driving th
 mapping validity footer and the detected-feature chips.
 
 **Persistence.** Zustand `persist` saves `{ theme, leftOpen, rightOpen, inputTab,
-form }` under `rows2graph-web`. It's versioned (`version: 1`) with a `migrate` that
+form }` under `sql2graph-web`. It's versioned (`version: 1`) with a `migrate` that
 drops the obsolete `mappingOpen` flag while preserving the user's saved `form`.
 
 ## Conventions

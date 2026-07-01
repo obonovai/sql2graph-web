@@ -1,4 +1,4 @@
-import { SERVER_TYPE_BY_TARGET, modesForTarget, useStore } from "@/hooks/useStore";
+import { SERVER_TYPE_BY_TARGET, modesForTarget, useStore, usesThrowawayDb } from "@/hooks/useStore";
 import { Field, NumberValueInput, Select, TextInput } from "@/components/ui/primitives";
 
 // Home of the run's validation config: mode, the connection details that only
@@ -16,7 +16,7 @@ export function ValidationSettingsForm() {
   const serverType = SERVER_TYPE_BY_TARGET[target];
   const modes = modesForTarget(options, target);
   const s = validation.server;
-  const primaryFilled = (serverType === "neo4j" ? s.uri : s.url).trim().length > 0;
+  const throwaway = useStore((st) => usesThrowawayDb(st.form));
 
   return (
     <div className="space-y-3">
@@ -26,11 +26,6 @@ export function ValidationSettingsForm() {
           onChange={(v) => setValidationMode(v as never)}
           options={modes.map((m) => ({ value: m, label: m }))}
         />
-        {target === "aql" && (
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            AQL has no in-process syntax check; use <code>server</code> validation.
-          </p>
-        )}
       </Field>
 
       {validation.mode === "server" && (
@@ -102,7 +97,7 @@ export function ValidationSettingsForm() {
             </>
           )}
 
-          {!primaryFilled && (
+          {throwaway && (
             <p
               className={
                 "rounded-md px-2 py-1.5 text-[11px] " +

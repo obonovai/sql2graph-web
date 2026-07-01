@@ -1,10 +1,10 @@
 [project]
-name = "rows2graph-web-backend"
+name = "sql2graph-web-backend"
 version = "0.1.0"
-description = "FastAPI backend that wraps the rows2graph library for the web UI."
+description = "FastAPI backend that wraps the sql2graph library for the web UI."
 requires-python = ">=3.12"
 dependencies = [
-    "rows2graph",
+    "sql2graph",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "sse-starlette>=2.1",
@@ -18,9 +18,9 @@ dependencies = [
 docker = ["docker>=7"]
 
 # The library lives in the sibling repo and is installed editable into the same
-# venv, so the backend imports rows2graph exactly as a third-party user would.
+# venv, so the backend imports sql2graph exactly as a third-party user would.
 [tool.uv.sources]
-rows2graph = { path = "../../rows2graph", editable = true }
+sql2graph = { path = "../../sql2graph", editable = true }
 
 # This backend is an application, not a distributable package: no build step.
 [tool.uv]
@@ -42,7 +42,7 @@ select = ["E", "F", "I", "W", "UP", "B"]
 
 [tool.mypy]
 strict = true
-# rows2graph ships py.typed; its transitive driver deps do not.
+# sql2graph ships py.typed; its transitive driver deps do not.
 [[tool.mypy.overrides]]
 module = ["sse_starlette.*"]
 ignore_missing_imports = true

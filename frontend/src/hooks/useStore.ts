@@ -6,6 +6,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as api from "@/lib/api";
 import type {
+  GeneratedMapping,
   LlmSettings,
   MappingValidity,
   Message,
@@ -25,6 +26,22 @@ export type Status = "idle" | "provisioning" | "generating" | "validating" | "fi
 // instead of each re-declaring the set.
 export const RUNNING_STATUSES = new Set<Status>(["generating", "validating", "fixing", "provisioning"]);
 
+// One label per running status, shared by the result footer (OutcomePanel) and the
+// chat sidebar so the two can't drift apart. `currentIteration`/`stalled` refine the
+// validating/fixing text; provisioning names the throwaway-DB warmup explicitly.
+export function runningLabel(status: Status, opts?: { stalled?: boolean; currentIteration?: number }): string {
+  switch (status) {
+    case "provisioning":
+      return "Setting up throwaway database… (first run can take 10-40s)";
+    case "generating":
+      return "Generating query…";
+    case "validating":
+      return `Validating (iteration ${opts?.currentIteration ?? 0})…`;
+    default:
+      return opts?.stalled ? "Escalating (hotter retry)…" : "Fixing…";
+  }
+}
+
 // A generic bag of every possible server-config field; the relevant subset is
 // picked per target at request-build time.
 export interface ServerBag {
@@ -41,8 +58,31 @@ export interface FormState {
   target: Target;
   llm: LlmSettings;
   validation: { mode: ValidationMode; max_iterations: number | null; server: ServerBag };
+  // The ACTIVE mapping used for translation (shown+edited in the SQL window's inner
+  // schema-mapping tab; set by "Use this mapping" or by Upload there).
   mappingYaml: string;
   sql: string;
+  // "Build mode" inputs: the CREATE TABLE DDL and its dialect, used by
+  // buildMapping() to generate a draft mapping. Kept in `form` so they persist
+  // alongside sql/mappingYaml.
+  ddl: string;
+  dialect: string;
+  // The DRAFT mapping - the Schema-mapping window's output. Built from DDL and
+  // hand-editable; promoted to `mappingYaml` via useThisMapping(). Separate so the
+  // builder never disturbs the mapping translation is currently using.
+  draftMappingYaml: string;
+}
+
+export type BuildStatus = "idle" | "loading" | "done" | "error";
+
+// Transient state for the generate-mapping-from-DDL flow (the ex-modal). Parallels
+// `stream`: never persisted, reset per run. `conversation` is the AI naming pass
+// that streams into the shared chat sidebar.
+interface BuildState {
+  status: BuildStatus;
+  conversation: Message[];
+  result: GeneratedMapping | null;
+  errorMessage: string | null;
 }
 
 interface StreamState {
@@ -94,6 +134,9 @@ const DEFAULT_FORM: FormState = {
   validation: { mode: "syntax", max_iterations: 3, server: { ...EMPTY_SERVER } },
   mappingYaml: "",
   sql: "",
+  ddl: "",
+  dialect: "generic",
+  draftMappingYaml: "",
 };
 
 const INITIAL_STREAM: StreamState = {
@@ -114,6 +157,13 @@ const INITIAL_STREAM: StreamState = {
   unmappedColumns: null,
 };
 
+const INITIAL_BUILD: BuildState = {
+  status: "idle",
+  conversation: [],
+  result: null,
+  errorMessage: null,
+};
+
 export const SERVER_TYPE_BY_TARGET: Record<Target, ServerType> = {
   cypher: "neo4j",
   aql: "arangodb",
@@ -128,14 +178,29 @@ export function modesForTarget(options: Options | null, target: Target): Validat
   return options?.validation_modes_by_target?.[target] ?? ["none", "syntax", "server"];
 }
 
+// True when a `server`-mode run will fall back to the auto-provisioned throwaway DB:
+// the primary connection field for the target's server type is left blank. Shared by
+// the request builder, the validation form's hint, and the header chip.
+export function usesThrowawayDb(form: FormState): boolean {
+  if (form.validation.mode !== "server") return false;
+  const s = form.validation.server;
+  const primary = SERVER_TYPE_BY_TARGET[form.target] === "neo4j" ? s.uri : s.url;
+  return !primary.trim();
+}
+
 interface Store {
   options: Options | null;
   theme: "light" | "dark";
   leftOpen: boolean;
   rightOpen: boolean;
-  inputTab: "mapping" | "sql";
+  // The active top-level workspace tab: the schema-mapping window (DDL input -> mapping
+  // output) or the SQL window (SQL input -> query output). Persisted.
+  view: "mapping" | "sql";
+  // The SQL window's inner tab: view/edit the active mapping, or the SQL query.
+  sqlInner: "mapping" | "sql";
   form: FormState;
-  mappingValidity: MappingValidity | null;
+  mappingValidity: MappingValidity | null; // validity of the ACTIVE mapping (form.mappingYaml)
+  draftValidity: MappingValidity | null; // validity of the DRAFT mapping (form.draftMappingYaml)
   features: string[];
   // Live (as-you-type) pre-flight feedback, independent of a run:
   sqlParseOk: boolean; // false → SQL won't parse; show a "will translate anyway" hint
@@ -143,12 +208,16 @@ interface Store {
   coverageUnmappedColumns: string[]; // SQL columns of mapped tables the mapping omits
   stream: StreamState;
   abort: AbortController | null;
+  // Build-mode ("generate mapping from DDL") run state, mirroring stream/abort.
+  build: BuildState;
+  buildAbort: AbortController | null;
 
   init: () => Promise<void>;
   toggleTheme: () => void;
   setLeftOpen: (b: boolean) => void;
   setRightOpen: (b: boolean) => void;
-  setInputTab: (t: "mapping" | "sql") => void;
+  setView: (v: "mapping" | "sql") => void;
+  setSqlInner: (v: "mapping" | "sql") => void;
 
   setTarget: (t: Target) => void;
   setProvider: (p: Provider) => void;
@@ -158,12 +227,20 @@ interface Store {
   setServer: (patch: Partial<ServerBag>) => void;
   setMappingYaml: (s: string) => void;
   setSql: (s: string) => void;
+  setDdl: (s: string) => void;
+  setDialect: (s: string) => void;
+  setDraftMappingYaml: (s: string) => void;
 
   refreshMappingValidity: () => Promise<void>;
+  refreshDraftValidity: () => Promise<void>;
   refreshFeatures: () => Promise<void>;
   refreshCoverage: () => Promise<void>;
   translate: () => Promise<void>;
   stop: () => void;
+  buildMapping: () => Promise<void>;
+  stopBuild: () => void;
+  useThisMapping: () => void;
+  clearMapping: () => void;
   clearWorkspace: () => void;
   canTranslate: () => boolean;
 }
@@ -184,29 +261,32 @@ function ollamaDefault(options: Options | null, key: string): number | null {
   return typeof v === "number" ? v : null;
 }
 
+// The dialect selector's "generic" is a UI sentinel for "no dialect"; the backend
+// and library only ever see a real sqlglot dialect name or null. Convert at the edge.
+const toDialect = (d: string): string | null => (d === "generic" ? null : d);
+
 function buildRequest(form: FormState): TranslateRequest {
   const { mode, max_iterations, server } = form.validation;
   let server_config = null as TranslateRequest["validation"]["server_config"];
-  if (mode === "server") {
-    const type = SERVER_TYPE_BY_TARGET[form.target];
-    const primary = type === "neo4j" ? server.uri : server.url;
-    if (primary.trim()) {
-      server_config = {
-        type,
-        uri: server.uri || null,
-        url: server.url || null,
-        username: server.username || null,
-        password: server.password || null,
-        database: server.database || null,
-        traversal_source: server.traversal_source || null,
-        notifications_min_severity: server.notifications_min_severity || null,
-      };
-    }
+  // A `server`-mode run with a blank primary field falls back to the throwaway DB
+  // (server_config stays null); otherwise send the filled connection.
+  if (mode === "server" && !usesThrowawayDb(form)) {
+    server_config = {
+      type: SERVER_TYPE_BY_TARGET[form.target],
+      uri: server.uri || null,
+      url: server.url || null,
+      username: server.username || null,
+      password: server.password || null,
+      database: server.database || null,
+      traversal_source: server.traversal_source || null,
+      notifications_min_severity: server.notifications_min_severity || null,
+    };
   }
   return {
     target: form.target,
     mapping_yaml: form.mappingYaml,
     sql: form.sql,
+    dialect: toDialect(form.dialect),
     llm: {
       ...form.llm,
       host: form.llm.host || null,
@@ -226,15 +306,19 @@ export const useStore = create<Store>()(
       theme: "light",
       leftOpen: true,
       rightOpen: true,
-      inputTab: "mapping",
+      view: "mapping",
+      sqlInner: "sql",
       form: DEFAULT_FORM,
       mappingValidity: null,
+      draftValidity: null,
       features: [],
       sqlParseOk: true,
       coverageUnmapped: [],
       coverageUnmappedColumns: [],
       stream: INITIAL_STREAM,
       abort: null,
+      build: INITIAL_BUILD,
+      buildAbort: null,
 
       init: async () => {
         try {
@@ -250,7 +334,7 @@ export const useStore = create<Store>()(
           if (llm.repeat_penalty == null) patch.repeat_penalty = ollamaDefault(options, "repeat_penalty");
           if (llm.num_ctx == null) patch.num_ctx = ollamaDefault(options, "num_ctx");
           if (Object.keys(patch).length > 0) get().setLlm(patch);
-          // Clamp a now-invalid persisted mode (e.g. a pre-change aql + syntax).
+          // Clamp a persisted mode that isn't valid for the current target.
           const { target, validation } = get().form;
           const allowed = modesForTarget(get().options, target);
           if (!allowed.includes(validation.mode)) get().setValidationMode(allowed[0]);
@@ -258,12 +342,14 @@ export const useStore = create<Store>()(
           console.error("Failed to load options", e);
         }
         if (get().form.mappingYaml.trim()) get().refreshMappingValidity();
+        if (get().form.draftMappingYaml.trim()) get().refreshDraftValidity();
       },
 
       toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       setLeftOpen: (b) => set({ leftOpen: b }),
       setRightOpen: (b) => set({ rightOpen: b }),
-      setInputTab: (t) => set({ inputTab: t }),
+      setView: (v) => set({ view: v }),
+      setSqlInner: (v) => set({ sqlInner: v }),
 
       setTarget: (t) =>
         set((s) => {
@@ -285,6 +371,9 @@ export const useStore = create<Store>()(
         })),
       setMappingYaml: (str) => set((s) => ({ form: { ...s.form, mappingYaml: str } })),
       setSql: (str) => set((s) => ({ form: { ...s.form, sql: str } })),
+      setDdl: (str) => set((s) => ({ form: { ...s.form, ddl: str } })),
+      setDialect: (str) => set((s) => ({ form: { ...s.form, dialect: str } })),
+      setDraftMappingYaml: (str) => set((s) => ({ form: { ...s.form, draftMappingYaml: str } })),
 
       refreshMappingValidity: async () => {
         const yaml = get().form.mappingYaml;
@@ -299,14 +388,27 @@ export const useStore = create<Store>()(
         }
       },
 
+      refreshDraftValidity: async () => {
+        const yaml = get().form.draftMappingYaml;
+        if (!yaml.trim()) {
+          set({ draftValidity: null });
+          return;
+        }
+        try {
+          set({ draftValidity: await api.validateMapping(yaml) });
+        } catch {
+          set({ draftValidity: null });
+        }
+      },
+
       refreshFeatures: async () => {
-        const sql = get().form.sql;
+        const { sql, dialect } = get().form;
         if (!sql.trim()) {
           set({ features: [], sqlParseOk: true });
           return;
         }
         try {
-          const { features, parse_ok } = await api.detectFeatures(sql);
+          const { features, parse_ok } = await api.detectFeatures(sql, toDialect(dialect));
           set({ features, sqlParseOk: parse_ok });
         } catch {
           /* keep previous */
@@ -318,13 +420,13 @@ export const useStore = create<Store>()(
         // tables aren't in the current mapping. Needs both SQL and mapping, so
         // it re-runs when either changes (see useTableCoverage). The backend
         // soft-fails (empty list) on unparseable SQL or an invalid mapping.
-        const { sql, mappingYaml } = get().form;
+        const { sql, mappingYaml, dialect } = get().form;
         if (!sql.trim() || !mappingYaml.trim()) {
           set({ coverageUnmapped: [], coverageUnmappedColumns: [] });
           return;
         }
         try {
-          const { unmapped_tables, unmapped_columns } = await api.checkCoverage(sql, mappingYaml);
+          const { unmapped_tables, unmapped_columns } = await api.checkCoverage(sql, mappingYaml, toDialect(dialect));
           set({ coverageUnmapped: unmapped_tables, coverageUnmappedColumns: unmapped_columns });
         } catch {
           /* keep previous */
@@ -457,6 +559,63 @@ export const useStore = create<Store>()(
         set((s) => ({ abort: null, stream: { ...s.stream, status: s.stream.status === "done" ? "done" : "idle" } }));
       },
 
+      // Generate a mapping from the DDL in `form.ddl`. Mirrors translate(): opens the
+      // build-mapping SSE stream, reduces its `conversation` snapshots into the build
+      // slice (which feeds the shared chat sidebar), and on completion writes the
+      // generated YAML into form.draftMappingYaml (the DRAFT - never the active mapping)
+      // so the debounced draft validation refreshes the YAML/Graph view.
+      buildMapping: async () => {
+        const { form } = get();
+        if (!form.ddl.trim() || get().build.status === "loading") return;
+        get().buildAbort?.abort();
+        const buildAbort = new AbortController();
+        set({
+          buildAbort,
+          build: { ...INITIAL_BUILD, status: "loading" },
+        });
+        await api.buildMappingStream(
+          { ddl: form.ddl, dialect: toDialect(form.dialect), llm: form.llm },
+          {
+            signal: buildAbort.signal,
+            onConversation: (messages) => set((s) => ({ build: { ...s.build, conversation: messages } })),
+            onDone: (result) => {
+              set((s) => ({ build: { ...s.build, result, status: "done" }, buildAbort: null }));
+              get().setDraftMappingYaml(result.mapping_yaml);
+              void get().refreshDraftValidity();
+            },
+            onError: (message) =>
+              set((s) => ({ build: { ...s.build, status: "error", errorMessage: message }, buildAbort: null })),
+          },
+        );
+      },
+
+      stopBuild: () => {
+        get().buildAbort?.abort();
+        set((s) => ({ buildAbort: null, build: { ...s.build, status: s.build.status === "done" ? "done" : "idle" } }));
+      },
+
+      // Promote the draft mapping to the ACTIVE mapping used for translation, then jump
+      // to the SQL window's schema-mapping tab so it is visible there.
+      useThisMapping: () => {
+        get().setMappingYaml(get().form.draftMappingYaml);
+        void get().refreshMappingValidity();
+        set({ view: "sql", sqlInner: "mapping" });
+      },
+
+      // Schema-mapping tab's Clear: wipe the DDL, the draft mapping, and the build run.
+      // Leaves the active mapping (used for translation) untouched.
+      clearMapping: () => {
+        get().buildAbort?.abort();
+        set((s) => ({
+          form: { ...s.form, ddl: "", draftMappingYaml: "" },
+          build: INITIAL_BUILD,
+          buildAbort: null,
+          draftValidity: null,
+        }));
+      },
+
+      // SQL tab's Clear: wipe the SQL query and the last run outcome. Leaves the active
+      // mapping and the draft untouched.
       clearWorkspace: () =>
         set((s) => ({
           form: { ...s.form, sql: "" },
@@ -468,22 +627,33 @@ export const useStore = create<Store>()(
         })),
     }),
     {
-      name: "rows2graph-web",
-      version: 1,
-      // v0 persisted a `mappingOpen` flag (the schema-mapping drawer). The drawer
-      // is gone, mapping is now an input tab (`inputTab`), so drop the stale key
-      // while preserving the user's saved `form` (SQL + mapping). `inputTab` is
-      // absent from old storage and falls back to its initial value.
+      name: "sql2graph-web",
+      version: 4,
+      // v0 persisted a `mappingOpen` flag (the schema-mapping drawer) - dropped.
+      // v2 added `form.ddl`/`form.dialect` (the build inputs) - backfilled so a
+      // rehydrated older `form` isn't missing keys.
+      // v3 renamed the persisted `inputTab` to the top-level `view` (the workspace
+      // tab) and removed the short-lived `centerMode`; carry the old value over.
+      // v4 split the mapping into active (`form.mappingYaml`) + `form.draftMappingYaml`
+      // and added the SQL window's inner tab `sqlInner`; backfill both.
       migrate: (persisted: unknown) => {
         const s = { ...((persisted as Record<string, unknown>) ?? {}) };
         delete s.mappingOpen;
+        delete s.centerMode;
+        if (s.inputTab && s.view === undefined) s.view = s.inputTab;
+        delete s.inputTab;
+        if (s.sqlInner === undefined) s.sqlInner = "sql";
+        if (s.form && typeof s.form === "object") {
+          s.form = { ddl: "", dialect: "generic", draftMappingYaml: "", ...(s.form as Record<string, unknown>) };
+        }
         return s as unknown as Store;
       },
       partialize: (s) => ({
         theme: s.theme,
         leftOpen: s.leftOpen,
         rightOpen: s.rightOpen,
-        inputTab: s.inputTab,
+        view: s.view,
+        sqlInner: s.sqlInner,
         form: s.form,
       }),
     },

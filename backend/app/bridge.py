@@ -2,7 +2,7 @@
 
 The library invokes ``on_event`` and ``on_conversation`` synchronously, on the
 same event-loop task that runs ``translate()`` (see
-``rows2graph/src/rows2graph/async_translator.py``). So the bridge is simple:
+``sql2graph/src/sql2graph/async_translator.py``). So the bridge is simple:
 
 * milestone events go onto an ``asyncio.Queue`` via ``put_nowait`` (never await,
   never a threading queue) and are forwarded immediately;
@@ -28,7 +28,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-from rows2graph import (
+from sql2graph import (
     AsyncSQLTranslator,
     CompletedEvent,
     FixGeneratedEvent,
@@ -41,6 +41,9 @@ from rows2graph import (
     UnmappedTablesEvent,
     ValidatedEvent,
 )
+
+from . import library
+from .models import LlmSettings
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +129,66 @@ async def stream(translator: AsyncSQLTranslator, sql: str, effective_mode: str) 
                 yield _sse("conversation", latest_conversation)
 
             if item is None:  # sentinel: translation finished or errored
+                break
+            yield item
+    finally:
+        if not task.done():
+            task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
+async def stream_build_mapping(
+    ddl: str,
+    dialect: str | None,
+    llm_settings: LlmSettings,
+) -> AsyncIterator[dict[str, str]]:
+    """Yield SSE events for one mapping build with live refinement streaming.
+
+    Same coalescing pattern as :func:`stream`: the refinement's per-token
+    ``on_conversation`` snapshots are flushed at most once per tick as
+    ``conversation`` events, then a final ``done`` event carries the full result
+    dict (or an ``error`` event on failure).
+    """
+    queue: asyncio.Queue[dict[str, str] | None] = asyncio.Queue()
+    latest_conversation: list[dict[str, str]] | None = None
+    dirty = False
+
+    def on_conversation(snapshot: list[dict[str, str]]) -> None:
+        nonlocal latest_conversation, dirty
+        latest_conversation = snapshot
+        dirty = True
+
+    async def runner() -> None:
+        try:
+            result = await library.build_mapping_from_ddl_async(
+                ddl, dialect=dialect, llm=llm_settings, on_conversation=on_conversation
+            )
+            queue.put_nowait(_sse("done", result))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - surface any failure to the client
+            logger.exception("mapping build failed")
+            queue.put_nowait(_sse("error", {"message": f"{type(exc).__name__}: {exc}"}))
+        finally:
+            queue.put_nowait(None)  # sentinel
+
+    task = asyncio.create_task(runner())
+    try:
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=_COALESCE_SECONDS)
+            except TimeoutError:
+                if dirty and latest_conversation is not None:
+                    dirty = False
+                    yield _sse("conversation", latest_conversation)
+                continue
+
+            if dirty and latest_conversation is not None:
+                dirty = False
+                yield _sse("conversation", latest_conversation)
+
+            if item is None:  # sentinel: build finished or errored
                 break
             yield item
     finally:

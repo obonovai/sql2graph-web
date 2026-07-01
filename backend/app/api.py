@@ -10,7 +10,7 @@ import yaml
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticUndefined
-from rows2graph import (
+from sql2graph import (
     TARGET_SERVER_TYPE,
     VALID_PROVIDERS,
     VALID_TARGETS,
@@ -22,12 +22,12 @@ from rows2graph import (
     analyze_sql,
     valid_modes_for_target,
 )
-from rows2graph.preflight import find_unmapped_columns, find_unmapped_tables
+from sql2graph.preflight import find_unmapped_columns, find_unmapped_tables
 from sse_starlette.sse import EventSourceResponse
 
 from . import library, presets
-from .bridge import stream
-from .models import CoverageBody, MappingBody, SqlBody, TranslateRequest
+from .bridge import stream, stream_build_mapping
+from .models import BuildMappingBody, CoverageBody, MappingBody, SqlBody, TranslateRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -75,8 +75,8 @@ def options() -> dict[str, Any]:
         "providers": list(VALID_PROVIDERS),
         "targets": list(VALID_TARGETS),
         "validation_modes": list(VALID_VALIDATION_MODES),
-        # Per-target allowed modes (AQL has no deployment-free 'syntax' validator).
-        # The frontend uses this to offer only valid modes for the chosen target.
+        # Per-target allowed modes. The frontend uses this to offer only valid
+        # modes for the chosen target.
         "validation_modes_by_target": {t: list(valid_modes_for_target(t)) for t in VALID_TARGETS},
         "defaults": {
             "anthropic": model_defaults["anthropic"],
@@ -111,10 +111,18 @@ def validate_mapping(body: MappingBody) -> dict[str, Any]:
     try:
         mapping = SchemaMapping.from_yaml_string(body.mapping_yaml)
     except yaml.YAMLError as exc:
-        return {"valid": False, "errors": [f"YAML parse error: {exc}"], "node_count": 0, "edge_count": 0}
+        return {"valid": False, "errors": [f"YAML parse error: {exc}"], "node_count": 0, "edge_count": 0, "graph": None}
     except ValidationError as exc:
-        return {"valid": False, "errors": _format_validation_errors(exc), "node_count": 0, "edge_count": 0}
-    return {"valid": True, "errors": [], "node_count": len(mapping.nodes), "edge_count": len(mapping.edges)}
+        errors = _format_validation_errors(exc)
+        return {"valid": False, "errors": errors, "node_count": 0, "edge_count": 0, "graph": None}
+    # The structured graph lets the editor draw the mapping; only emitted when valid.
+    return {
+        "valid": True,
+        "errors": [],
+        "node_count": len(mapping.nodes),
+        "edge_count": len(mapping.edges),
+        "graph": mapping.model_dump(),
+    }
 
 
 # pydantic prefixes messages raised from a validator's ValueError/AssertionError; strip the noise.
@@ -149,6 +157,24 @@ def _format_validation_errors(exc: ValidationError) -> list[str]:
     return msgs
 
 
+@router.post("/build-mapping-stream")
+async def build_mapping_stream(body: BuildMappingBody) -> EventSourceResponse:
+    """SSE: stream the LLM naming conversation, then a final ``done`` result.
+
+    The structure is derived deterministically and the LLM naming pass always runs;
+    its conversation streams as ``conversation`` events, then ``done`` carries the
+    generated mapping (or ``error`` on failure). Invalid model config or empty DDL
+    surface as HTTP 400 before streaming starts, the same contract as ``/translate``.
+    """
+    if not body.ddl.strip():
+        raise HTTPException(status_code=400, detail="DDL is empty.")
+    try:
+        library.build_model_config(body.llm)  # surface invalid model config as 400
+    except (ValidationError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return EventSourceResponse(stream_build_mapping(body.ddl, body.dialect, body.llm))
+
+
 @router.post("/detect-features")
 def detect(body: SqlBody) -> dict[str, Any]:
     """The same SQL analysis the translator runs internally.
@@ -159,7 +185,7 @@ def detect(body: SqlBody) -> dict[str, Any]:
     """
     if not body.sql.strip():
         return {"features": [], "parse_ok": True}
-    analysis = analyze_sql(body.sql)
+    analysis = analyze_sql(body.sql, dialect=body.dialect)
     return {"features": sorted(f.value for f in analysis.features), "parse_ok": analysis.parse_ok}
 
 
@@ -175,7 +201,7 @@ def check_coverage(body: CoverageBody) -> dict[str, Any]:
     """
     if not body.sql.strip():
         return {"unmapped_tables": [], "unmapped_columns": [], "parse_ok": True}
-    analysis = analyze_sql(body.sql)
+    analysis = analyze_sql(body.sql, dialect=body.dialect)
     if not analysis.parse_ok:
         return {"unmapped_tables": [], "unmapped_columns": [], "parse_ok": False}
     try:

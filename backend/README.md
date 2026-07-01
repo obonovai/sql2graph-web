@@ -1,11 +1,11 @@
-# rows2graph-web · backend
+# sql2graph-web · backend
 
-A small FastAPI app that exposes the [`rows2graph`](../../rows2graph) library to the
+A small FastAPI app that exposes the [`sql2graph`](../../sql2graph) library to the
 browser. It is a **thin wrapper**: it converts the web request into the library's
 own config objects, runs `AsyncSQLTranslator.translate(...)`, and streams the
 result to the frontend as Server-Sent Events. It adds no translation logic of its
-own: the same wiring `rows2graph/demo/cli.py` uses, driven by an HTTP request
-instead of argparse + files.
+own: the library's own factories and wiring, driven by an HTTP request
+instead of local files.
 
 For prerequisites, running, validation modes, configuration, and the endpoint
 table, see the [top-level README](../README.md).
@@ -19,7 +19,7 @@ table, see the [top-level README](../README.md).
 | `bridge.py` | The SSE bridge: see below. |
 | `library.py` | The **only** module that touches the library: builds the `SchemaMapping`, model config, and (optional) server config from the request, and assembles the translator. Resolves `server` mode with an empty connection to `managed` (throwaway DB). |
 | `models.py` | Pydantic request models (`TranslateRequest`, `LlmSettings`, `ServerSettings`, `ValidationSettings`, …). Their shapes mirror `frontend/src/lib/types.ts`. |
-| `presets.py` | Reads the library's `config/` dir for the bundled mapping presets and the per-provider model defaults, so the UI's defaults always match the library. |
+| `presets.py` | Reads the library's `examples/` dir for the bundled mapping presets and its `config/` dir for the per-provider model defaults, so the UI's defaults always match the library. |
 
 ## The SSE bridge (`bridge.py`)
 
@@ -52,8 +52,9 @@ uv run uvicorn app.main:app --reload --port 8000
 ```
 
 Env: `ANTHROPIC_API_KEY` (Anthropic), `OLLAMA_HOST` (default Ollama endpoint),
-`ROWS2GRAPH_CONFIG_DIR` (override the library `config/` dir; defaults to
-`../rows2graph/config`).
+`SQL2GRAPH_CONFIG_DIR` (override the library `config/` dir for model defaults;
+defaults to `../sql2graph/config`), `SQL2GRAPH_EXAMPLES_DIR` (override the
+library `examples/` dir for preset mappings; defaults to `../sql2graph/examples`).
 
 ## Checks
 

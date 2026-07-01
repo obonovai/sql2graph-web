@@ -1,9 +1,9 @@
 """Reads the library's own config dir so the UI's presets and defaults always
 match the library.
 
-- Schema-mapping presets come from ``rows2graph/config/mappings/{tpch,ldbc}.yaml``
+- Schema-mapping presets come from ``sql2graph/examples/mappings/{tpch,ldbc}.yaml``
   (each paired with a sample SQL query so Translate works in one click).
-- Model defaults come from ``rows2graph/config/models/{ollama,anthropic}.yaml``
+- Model defaults come from ``sql2graph/config/models/{ollama,anthropic}.yaml``
   (loaded via the library's own ``load_model_config``), so editing those files is
   the single source of truth for the sidebar's model field.
 """
@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, TypedDict
 
-from rows2graph import AnthropicConfig, OllamaConfig, load_model_config
+from sql2graph import AnthropicConfig, OllamaConfig, load_model_config
 
 
 class Preset(TypedDict):
@@ -30,15 +30,23 @@ _SAMPLE_SQL: dict[str, str] = {
 
 
 def _config_dir() -> Path:
-    override = os.environ.get("ROWS2GRAPH_CONFIG_DIR")
+    override = os.environ.get("SQL2GRAPH_CONFIG_DIR")
     if override:
         return Path(override)
-    # app/presets.py -> app -> backend -> rows2graph-web -> school/rows2graph
-    return Path(__file__).resolve().parents[3] / "rows2graph" / "config"
+    # app/presets.py -> app -> backend -> sql2graph-web -> school/sql2graph
+    return Path(__file__).resolve().parents[3] / "sql2graph" / "config"
+
+
+def _examples_dir() -> Path:
+    override = os.environ.get("SQL2GRAPH_EXAMPLES_DIR")
+    if override:
+        return Path(override)
+    # app/presets.py -> app -> backend -> sql2graph-web -> school/sql2graph
+    return Path(__file__).resolve().parents[3] / "sql2graph" / "examples"
 
 
 def load_presets() -> list[Preset]:
-    base = _config_dir() / "mappings"
+    base = _examples_dir() / "mappings"
     presets: list[Preset] = []
     for name in ("tpch", "ldbc"):
         path = base / f"{name}.yaml"

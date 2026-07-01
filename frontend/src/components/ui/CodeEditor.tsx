@@ -5,7 +5,7 @@ import { sql } from "@codemirror/lang-sql";
 import { yaml } from "@codemirror/lang-yaml";
 import { EditorView } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 export type Lang = "sql" | "yaml" | "none";
 
@@ -31,17 +31,23 @@ export function CodeEditor({
   placeholder?: string;
   onSubmit?: () => void;
 }) {
+  // Keep onSubmit in a ref so a new closure each render (callers rarely memoize
+  // it) does not rebuild the extensions and reconfigure CodeMirror on every
+  // keystroke; the memo depends only on whether a handler exists.
+  const onSubmitRef = useRef(onSubmit);
+  onSubmitRef.current = onSubmit;
+  const hasSubmit = !!onSubmit;
   const extensions = useMemo<Extension[]>(() => {
     const ext: Extension[] = [transparentBg, EditorView.lineWrapping];
     if (language === "sql") ext.push(sql());
     else if (language === "yaml") ext.push(yaml());
-    if (onSubmit) {
+    if (hasSubmit) {
       ext.push(
         EditorView.domEventHandlers({
           keydown: (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
-              onSubmit();
+              onSubmitRef.current?.();
               return true;
             }
             return false;
@@ -50,7 +56,8 @@ export function CodeEditor({
       );
     }
     return ext;
-  }, [language, onSubmit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language, hasSubmit]);
 
   return (
     <CodeMirror

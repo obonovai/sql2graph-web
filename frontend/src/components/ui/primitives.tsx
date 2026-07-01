@@ -180,7 +180,6 @@ export function Select({
           position="popper"
           side="bottom"
           sideOffset={4}
-          avoidCollisions={false}
           className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-600 dark:bg-slate-800"
         >
           <RSelect.Viewport>
@@ -274,6 +273,80 @@ export function PaneHeader({ title, children }: { title: ReactNode; children?: R
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</span>
       {children}
     </div>
+  );
+}
+
+// A connected pill segmented control (e.g. YAML | Graph, Refined | Original). The
+// track holds the segments; the active segment is a raised white "thumb". This reads
+// as a single switch, distinct from the standalone action buttons beside it.
+export function SegmentedControl<T extends string>({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: ReactNode }[];
+  ariaLabel?: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-800"
+    >
+      {options.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.value)}
+            className={cls(
+              "rounded px-2.5 py-0.5 text-[11px] font-medium normal-case transition-colors",
+              active
+                ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Underline tab with an optional leading status dot. Put `items-stretch` on the
+// parent bar so the 2px active underline overlaps the bar's own border-b.
+export function Tab({
+  active,
+  onClick,
+  dot,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  dot?: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cls(
+        "inline-flex items-center gap-1.5 border-b-2 px-3 text-xs font-semibold uppercase tracking-wide transition-colors",
+        active
+          ? "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-300"
+          : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+      )}
+    >
+      {dot && <span className={cls("h-2 w-2 rounded-full", dot)} />}
+      {children}
+    </button>
   );
 }
 

@@ -1,12 +1,12 @@
-# rows2graph-web
+# sql2graph-web
 
-A simple, hand-owned web UI that wraps the [`rows2graph`](../rows2graph) library: translate
+A simple, hand-owned web UI that wraps the [`sql2graph`](../sql2graph) library: translate
 SQL into Cypher / AQL / Gremlin through a browser, no Python required. It is a thin wrapper: the
-backend calls the same public library API that `rows2graph/demo/cli.py` uses and adds no
+backend calls the public `sql2graph` library API and adds no
 translation logic of its own.
 
 ```
-┌Settings──┐ ┌ Header:  rows2graph · model · ☾ ────────────────┐ ┌Chat──────┐
+┌Settings──┐ ┌ Header:  sql2graph · model · ☾ ────────────────┐ ┌Chat──────┐
 │ LLM      │ │ Run setup:  Target ▾       [▸ Translate] [Clear] │ │ system ↔ │
 │ Valid.   │ │ ┌ Mapping │ SQL ┐    ║    ┌ Result ───────────┐  │ │ LLM      │
 │ (server) │ │ │  editor…       │    ║    │  generated query… │  │ │ stream   │
@@ -32,7 +32,7 @@ translation logic of its own.
 
 ## Prerequisites
 
-- The `rows2graph` library sibling repo (this app installs it editable from `../rows2graph`).
+- The `sql2graph` library sibling repo (this app installs it editable from `../sql2graph`).
 - An LLM backend:
   - **Anthropic**: export `ANTHROPIC_API_KEY` for the backend (the key is never entered in the
     browser).
@@ -57,7 +57,7 @@ npm run dev
 ```
 
 Open http://localhost:5173. Paste or **upload** a schema mapping (YAML) and a SQL query, pick a
-target, and click **Translate**. (Ready-made sample mappings live in `rows2graph/config/mappings/`.)
+target, and click **Translate**. (Ready-made sample mappings live in `sql2graph/examples/mappings/`.)
 
 ## Build (production)
 
@@ -80,8 +80,10 @@ When `frontend/dist/` exists the backend serves the SPA from `/` (same origin, n
 
 - `OLLAMA_HOST`: default Ollama endpoint when the sidebar host override is blank.
 - `ANTHROPIC_API_KEY`: read by the Anthropic SDK on the backend.
-- `ROWS2GRAPH_CONFIG_DIR`: override the library `config/` dir used for preset mappings
-  (`mappings/`) and the model-field defaults (`models/`); defaults to `../rows2graph/config`.
+- `SQL2GRAPH_CONFIG_DIR`: override the library `config/` dir used for the model-field
+  defaults (`models/`); defaults to `../sql2graph/config`.
+- `SQL2GRAPH_EXAMPLES_DIR`: override the library `examples/` dir used for the preset
+  mappings (`mappings/`); defaults to `../sql2graph/examples`.
 
 ## API
 

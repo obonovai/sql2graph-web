@@ -1,5 +1,5 @@
 import { Copy, Download } from "lucide-react";
-import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";
+import { RUNNING_STATUSES, runningLabel, useStore } from "@/hooks/useStore";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { Chip, FooterBar, IconButton, IssueStrip, PaneHeader, StatusText } from "@/components/ui/primitives";
 
@@ -52,16 +52,7 @@ export function OutcomePanel() {
         : "")
     : undefined;
 
-  const runningLabel =
-    status === "provisioning"
-      ? "Setting up database… (first run can take 10-40s)"
-      : status === "generating"
-        ? "Generating query…"
-        : status === "validating"
-          ? `Validating (iteration ${currentIteration})…`
-          : stalled
-            ? "Escalating (hotter retry)…"
-            : "Fixing…";
+  const label = runningLabel(status, { stalled, currentIteration });
 
   return (
     <div className="flex h-full flex-col">
@@ -96,7 +87,7 @@ export function OutcomePanel() {
       <FooterBar>
         {status === "idle" && <StatusText tone="muted">Ready.</StatusText>}
 
-        {RUNNING_STATUSES.has(status) && <StatusText tone="running">{runningLabel}</StatusText>}
+        {RUNNING_STATUSES.has(status) && <StatusText tone="running">{label}</StatusText>}
 
         {status === "error" && <StatusText tone="error">Error: {errorMessage ?? "translation failed"}</StatusText>}
 

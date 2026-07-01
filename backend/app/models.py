@@ -1,7 +1,7 @@
 """Pydantic request models for the web UI.
 
 These mirror the shape of the sidebar/main-area form. The backend converts them
-into the rows2graph library's own config objects in :mod:`app.library`; it adds
+into the sql2graph library's own config objects in :mod:`app.library`; it adds
 no translation logic of its own.
 """
 
@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-# These mirror rows2graph's VALID_PROVIDERS / VALID_TARGETS / VALID_VALIDATION_MODES
+# These mirror sql2graph's VALID_PROVIDERS / VALID_TARGETS / VALID_VALIDATION_MODES
 # and TARGET_SERVER_TYPE values. They stay spelled out here because a typing.Literal
 # needs compile-time members (it can't be built from the library's runtime tuples);
 # keep them in sync if the library's sets change.
@@ -67,6 +67,9 @@ class TranslateRequest(BaseModel):
     target: Target
     mapping_yaml: str
     sql: str
+    # sqlglot dialect for parsing the input SQL in pre-flight (parse_ok +
+    # table/column coverage); None = dialect-neutral. Never enters the prompt.
+    dialect: str | None = None
     llm: LlmSettings
     validation: ValidationSettings
 
@@ -77,8 +80,22 @@ class MappingBody(BaseModel):
 
 class SqlBody(BaseModel):
     sql: str
+    dialect: str | None = None
 
 
 class CoverageBody(BaseModel):
     sql: str
     mapping_yaml: str
+    dialect: str | None = None
+
+
+class BuildMappingBody(BaseModel):
+    """Request for generating a schema mapping from CREATE TABLE DDL.
+
+    The structure is derived deterministically and the LLM naming pass always runs,
+    reusing the same ``llm`` settings (and backend environment) as translation.
+    """
+
+    ddl: str
+    dialect: str | None = None
+    llm: LlmSettings

@@ -3,9 +3,13 @@
 // that the store consumes. Adds no logic of its own, just fetch + typing.
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import type {
+  BuildMappingSseEvent,
   CoverageCheck,
   FeatureDetection,
+  GeneratedMapping,
+  LlmSettings,
   MappingValidity,
+  Message,
   Options,
   SseEvent,
   TranslateRequest,
@@ -27,27 +31,80 @@ export async function validateMapping(mapping_yaml: string): Promise<MappingVali
   return r.json();
 }
 
-export async function detectFeatures(sql: string): Promise<FeatureDetection> {
+export async function detectFeatures(sql: string, dialect: string | null): Promise<FeatureDetection> {
   const r = await fetch("/api/detect-features", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, dialect }),
   });
   if (!r.ok) throw new Error(`/api/detect-features ${r.status}`);
   return r.json();
 }
 
-export async function checkCoverage(sql: string, mapping_yaml: string): Promise<CoverageCheck> {
+export async function checkCoverage(sql: string, mapping_yaml: string, dialect: string | null): Promise<CoverageCheck> {
   const r = await fetch("/api/check-coverage", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql, mapping_yaml }),
+    body: JSON.stringify({ sql, mapping_yaml, dialect }),
   });
   if (!r.ok) throw new Error(`/api/check-coverage ${r.status}`);
   return r.json();
 }
 
 class FatalSseError extends Error {}
+
+/**
+ * Open the build-mapping stream. The structure is derived deterministically and the
+ * LLM naming pass always runs: streams `conversation` snapshots, then a final `done`
+ * (the full GeneratedMapping) or `error`. Pass an AbortSignal so the modal can cancel
+ * on close.
+ */
+export function buildMappingStream(
+  req: { ddl: string; dialect: string | null; llm: LlmSettings },
+  handlers: {
+    signal: AbortSignal;
+    onConversation: (messages: Message[]) => void;
+    onDone: (result: GeneratedMapping) => void;
+    onError: (message: string) => void;
+  },
+): Promise<void> {
+  return fetchEventSource("/api/build-mapping-stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    signal: handlers.signal,
+    openWhenHidden: true,
+    async onopen(res) {
+      if (res.ok && res.headers.get("content-type")?.includes("text/event-stream")) return;
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body?.detail) detail = body.detail;
+      } catch {
+        /* ignore */
+      }
+      throw new FatalSseError(detail);
+    },
+    onmessage(msg) {
+      if (!msg.event || !msg.data) return;
+      const ev = { event: msg.event, data: JSON.parse(msg.data) } as BuildMappingSseEvent;
+      if (ev.event === "conversation") handlers.onConversation(ev.data);
+      else if (ev.event === "done") handlers.onDone(ev.data);
+      else if (ev.event === "error") handlers.onError(ev.data.message);
+    },
+    onclose() {
+      /* server closed the stream; done/error already delivered */
+    },
+    onerror(err) {
+      const message = err instanceof Error ? err.message : String(err);
+      handlers.onError(message);
+      throw err; // stop fetch-event-source's auto-retry
+    },
+  }).catch((err) => {
+    if (handlers.signal.aborted) return; // closed the modal, not an error
+    if (err instanceof FatalSseError) handlers.onError(err.message);
+  });
+}
 
 /**
  * Open the translate SSE stream. Calls `onEvent` for each typed event, `onClose`

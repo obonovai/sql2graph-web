@@ -1,8 +1,8 @@
-"""Adapters: turn request JSON into rows2graph's own objects and components.
+"""Adapters: turn request JSON into sql2graph's own objects and components.
 
-This is the only place that touches the library. It mirrors
-``demo/cli.py:main()`` (same factories, same wiring) but builds inputs from the
-HTTP request instead of argparse + YAML files.
+This is the only place that touches the library. It uses the library's own
+factories and wiring but builds inputs from the HTTP request instead of
+local YAML files.
 """
 
 from __future__ import annotations
@@ -10,14 +10,17 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from rows2graph import (
+from sql2graph import (
     AnthropicConfig,
     ArangoDBConfig,
     AsyncSQLTranslator,
+    BuildResult,
+    ConversationCallback,
     GremlinConfig,
     Neo4jConfig,
     OllamaConfig,
     SchemaMapping,
+    build_mapping_async,
     make_async_llm,
     make_async_validator,
     make_target,
@@ -35,6 +38,23 @@ def _clean(d: dict[str, Any]) -> dict[str, Any]:
     """Drop None values so the library's strict (extra='forbid') configs keep
     their own defaults instead of receiving an unexpected ``None``."""
     return {k: v for k, v in d.items() if v is not None}
+
+
+def _build_result_to_dict(result: BuildResult) -> dict[str, Any]:
+    """Shape a library :class:`BuildResult` into the JSON the build endpoint returns.
+
+    ``graph`` is the structured node/edge view (the same shape as ``SchemaMapping``)
+    so the web UI can draw the mapping without a YAML parser. The deterministic
+    "skeleton" and the rename ``diff`` are intentionally omitted: the modal always
+    applies the AI-refined result and no longer compares the two versions."""
+    return {
+        "mapping_yaml": result.yaml,
+        "graph": result.mapping.model_dump(),
+        "report": result.report.as_dict(),
+        "warnings": result.warnings,
+        "refined": result.refined,
+        "conversation": result.conversation,
+    }
 
 
 def build_model_config(llm: LlmSettings) -> ModelConfig:
@@ -64,6 +84,31 @@ def build_model_config(llm: LlmSettings) -> ModelConfig:
             }
         )
     )
+
+
+async def build_mapping_from_ddl_async(
+    ddl: str,
+    *,
+    dialect: str | None = None,
+    llm: LlmSettings,
+    on_conversation: ConversationCallback | None = None,
+) -> dict[str, Any]:
+    """Generate a schema-mapping draft from CREATE TABLE DDL via the library.
+
+    The structure is derived deterministically and an LLM always improves the
+    node/edge names, running through the same model factory as translation (and the
+    same backend env, e.g. ``ANTHROPIC_API_KEY``). That pass is guarded by the
+    library, so a failed refinement simply returns the deterministic mapping with a
+    warning. Its conversation is streamed via *on_conversation* (the SSE bridge
+    consumes it). Raises the library's ``DdlParseError`` (a ``ValueError``) on
+    unparseable DDL, which the API surfaces as HTTP 400.
+    """
+    client = make_async_llm(build_model_config(llm))
+    try:
+        result = await build_mapping_async(ddl=ddl, dialect=dialect, llm=client, on_conversation=on_conversation)
+    finally:
+        await client.close()
+    return _build_result_to_dict(result)
 
 
 def build_server_config(sc: ServerSettings) -> ServerConfig:
@@ -112,13 +157,12 @@ def _server_is_empty(sc: ServerSettings) -> bool:
 def build_translator(req: TranslateRequest) -> tuple[AsyncSQLTranslator, str]:
     """Construct the translator from the request, returning it plus the effective
     validation mode (``server`` with an empty config resolves to ``managed``,
-    the same rule demo/cli.py applies)."""
+    the library's standard resolution rule)."""
     if req.validation.mode not in valid_modes_for_target(req.target):
         allowed = ", ".join(valid_modes_for_target(req.target))
         raise ValueError(
             f"Validation mode '{req.validation.mode}' is not available for target "
-            f"'{req.target}' (available: {allowed}). AQL has no deployment-free "
-            f"syntax validator; use 'server'."
+            f"'{req.target}' (available: {allowed})."
         )
     mapping = SchemaMapping.from_yaml_string(req.mapping_yaml)
     model_cfg = build_model_config(req.llm)
@@ -140,5 +184,6 @@ def build_translator(req: TranslateRequest) -> tuple[AsyncSQLTranslator, str]:
         target=target,
         validator=validator,
         max_iterations=req.validation.max_iterations,
+        dialect=req.dialect,
     )
     return translator, effective_mode

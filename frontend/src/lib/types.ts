@@ -39,6 +39,7 @@ export interface TranslateRequest {
   target: Target;
   mapping_yaml: string;
   sql: string;
+  dialect?: string | null;
   llm: LlmSettings;
   validation: ValidationSettings;
 }
@@ -75,11 +76,71 @@ export interface TranslationResult {
   token_usage?: TokenUsage;
 }
 
+// Structured node/edge view of a mapping (mirrors the library's SchemaMapping
+// model_dump), so the UI can draw the graph without parsing YAML.
+export interface GraphNode {
+  label: string; // node label (also its unique id; edges reference it)
+  source_table: string;
+  primary_key: string;
+  properties: Record<string, string>; // graph property name -> SQL column
+  // graph property name -> semantic type (date/datetime/integer/...). Optional and
+  // sparse: only typed properties appear. Optional so payloads from an editable
+  // library that predates typed properties still typecheck.
+  property_types?: Record<string, string>;
+}
+
+export interface GraphEdge {
+  type: string;
+  source_node: string; // a GraphNode.label
+  target_node: string; // a GraphNode.label
+  source_table: string;
+  source_foreign_key: string;
+  target_primary_key: string;
+  properties: Record<string, string>;
+  property_types?: Record<string, string>; // same as GraphNode.property_types
+}
+
+export interface MappingGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
 export interface MappingValidity {
   valid: boolean;
   errors: string[];
   node_count: number;
   edge_count: number;
+  graph: MappingGraph | null; // structured graph when valid, else null
+}
+
+// /api/build-mapping coverage report (mirrors CoverageReport.as_dict()).
+export interface CoverageReport {
+  node_tables: string[];
+  edge_tables: string[]; // junction tables collapsed to edges
+  fk_edges: string[];
+  dropped_objects: { name: string; reason: string }[];
+  synthesized_keys: string[];
+  warnings: string[];
+  node_count: number;
+  edge_count: number;
+}
+
+// /api/build-mapping-stream SSE events: conversation snapshots, then a final `done`
+// with the full result, or `error`.
+export type BuildMappingSseEvent =
+  | { event: "conversation"; data: Message[] }
+  | { event: "done"; data: GeneratedMapping }
+  | { event: "error"; data: { message: string } };
+
+// /api/build-mapping-stream `done` payload. The structure is derived deterministically
+// and the LLM naming pass always runs.
+export interface GeneratedMapping {
+  mapping_yaml: string; // the AI-refined mapping
+  graph: MappingGraph; // structured view of mapping_yaml (for the Graph toggle)
+  report: CoverageReport;
+  warnings: string[];
+  refined: boolean; // true iff the AI changed the deterministic draft
+  conversation: Message[]; // the AI naming chat
 }
 
 export interface Options {
