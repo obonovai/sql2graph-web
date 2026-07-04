@@ -71,6 +71,10 @@ export interface FormState {
   // hand-editable; promoted to `mappingYaml` via useThisMapping(). Separate so the
   // builder never disturbs the mapping translation is currently using.
   draftMappingYaml: string;
+  // Whether the next Generate runs the LLM naming pass. On -> the deterministic draft
+  // is refined and the result carries a diff to highlight; off -> a fast, free,
+  // deterministic-only draft (no model call). Persisted with the rest of `form`.
+  refineWithLlm: boolean;
 }
 
 export type BuildStatus = "idle" | "loading" | "done" | "error";
@@ -81,6 +85,8 @@ export type BuildStatus = "idle" | "loading" | "done" | "error";
 interface BuildState {
   status: BuildStatus;
   conversation: Message[];
+  // The build's GeneratedMapping already carries the run report (duration_seconds,
+  // token_usage) plus the mapping/diff, so consumers read those off `result` directly.
   result: GeneratedMapping | null;
   errorMessage: string | null;
 }
@@ -137,6 +143,7 @@ const DEFAULT_FORM: FormState = {
   ddl: "",
   dialect: "generic",
   draftMappingYaml: "",
+  refineWithLlm: true,
 };
 
 const INITIAL_STREAM: StreamState = {
@@ -230,6 +237,7 @@ interface Store {
   setDdl: (s: string) => void;
   setDialect: (s: string) => void;
   setDraftMappingYaml: (s: string) => void;
+  setRefineWithLlm: (b: boolean) => void;
 
   refreshMappingValidity: () => Promise<void>;
   refreshDraftValidity: () => Promise<void>;
@@ -239,7 +247,7 @@ interface Store {
   stop: () => void;
   buildMapping: () => Promise<void>;
   stopBuild: () => void;
-  useThisMapping: () => void;
+  useThisMapping: (yaml?: string) => void;
   clearMapping: () => void;
   clearWorkspace: () => void;
   canTranslate: () => boolean;
@@ -374,6 +382,7 @@ export const useStore = create<Store>()(
       setDdl: (str) => set((s) => ({ form: { ...s.form, ddl: str } })),
       setDialect: (str) => set((s) => ({ form: { ...s.form, dialect: str } })),
       setDraftMappingYaml: (str) => set((s) => ({ form: { ...s.form, draftMappingYaml: str } })),
+      setRefineWithLlm: (b) => set((s) => ({ form: { ...s.form, refineWithLlm: b } })),
 
       refreshMappingValidity: async () => {
         const yaml = get().form.mappingYaml;
@@ -574,7 +583,7 @@ export const useStore = create<Store>()(
           build: { ...INITIAL_BUILD, status: "loading" },
         });
         await api.buildMappingStream(
-          { ddl: form.ddl, dialect: toDialect(form.dialect), llm: form.llm },
+          { ddl: form.ddl, dialect: toDialect(form.dialect), llm: form.llm, refine: form.refineWithLlm },
           {
             signal: buildAbort.signal,
             onConversation: (messages) => set((s) => ({ build: { ...s.build, conversation: messages } })),
@@ -594,10 +603,11 @@ export const useStore = create<Store>()(
         set((s) => ({ buildAbort: null, build: { ...s.build, status: s.build.status === "done" ? "done" : "idle" } }));
       },
 
-      // Promote the draft mapping to the ACTIVE mapping used for translation, then jump
-      // to the SQL window's schema-mapping tab so it is visible there.
-      useThisMapping: () => {
-        get().setMappingYaml(get().form.draftMappingYaml);
+      // Promote a mapping to the ACTIVE mapping used for translation, then jump to the
+      // SQL window's schema-mapping tab so it is visible there. Defaults to the draft;
+      // pass the deterministic skeleton to promote the "Original" instead of the draft.
+      useThisMapping: (yaml?: string) => {
+        get().setMappingYaml(yaml ?? get().form.draftMappingYaml);
         void get().refreshMappingValidity();
         set({ view: "sql", sqlInner: "mapping" });
       },
@@ -628,7 +638,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: "sql2graph-web",
-      version: 4,
+      version: 5,
       // v0 persisted a `mappingOpen` flag (the schema-mapping drawer) - dropped.
       // v2 added `form.ddl`/`form.dialect` (the build inputs) - backfilled so a
       // rehydrated older `form` isn't missing keys.
@@ -636,6 +646,8 @@ export const useStore = create<Store>()(
       // tab) and removed the short-lived `centerMode`; carry the old value over.
       // v4 split the mapping into active (`form.mappingYaml`) + `form.draftMappingYaml`
       // and added the SQL window's inner tab `sqlInner`; backfill both.
+      // v5 added `form.refineWithLlm` (the AI-refine toggle); backfill to true so a
+      // rehydrated older `form` keeps today's always-refine behavior.
       migrate: (persisted: unknown) => {
         const s = { ...((persisted as Record<string, unknown>) ?? {}) };
         delete s.mappingOpen;
@@ -644,7 +656,13 @@ export const useStore = create<Store>()(
         delete s.inputTab;
         if (s.sqlInner === undefined) s.sqlInner = "sql";
         if (s.form && typeof s.form === "object") {
-          s.form = { ddl: "", dialect: "generic", draftMappingYaml: "", ...(s.form as Record<string, unknown>) };
+          s.form = {
+            ddl: "",
+            dialect: "generic",
+            draftMappingYaml: "",
+            refineWithLlm: true,
+            ...(s.form as Record<string, unknown>),
+          };
         }
         return s as unknown as Store;
       },

@@ -3,13 +3,22 @@
 // initial bundle. Same props as the underlying MappingGraph - import this instead.
 import { lazy, Suspense } from "react";
 import { Spinner } from "@/components/ui/primitives";
+import type { GraphChanges } from "@/components/MappingGraph";
 import type { MappingGraph as MappingGraphData } from "@/lib/types";
 
 const MappingGraphImpl = lazy(() =>
   import("@/components/MappingGraph").then((m) => ({ default: m.MappingGraph })),
 );
 
-export function MappingGraph({ graph, theme }: { graph: MappingGraphData; theme: "light" | "dark" }) {
+export function MappingGraph({
+  graph,
+  theme,
+  changed,
+}: {
+  graph: MappingGraphData;
+  theme: "light" | "dark";
+  changed?: GraphChanges;
+}) {
   return (
     <Suspense
       fallback={
@@ -18,7 +27,7 @@ export function MappingGraph({ graph, theme }: { graph: MappingGraphData; theme:
         </div>
       }
     >
-      <MappingGraphImpl graph={graph} theme={theme} />
+      <MappingGraphImpl graph={graph} theme={theme} changed={changed} />
     </Suspense>
   );
 }

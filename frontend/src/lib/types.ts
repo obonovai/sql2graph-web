@@ -132,15 +132,36 @@ export type BuildMappingSseEvent =
   | { event: "done"; data: GeneratedMapping }
   | { event: "error"; data: { message: string } };
 
-// /api/build-mapping-stream `done` payload. The structure is derived deterministically
-// and the LLM naming pass always runs.
+// One graph-facing name the AI refinement renamed (mirrors the library's RenameDiff).
+export interface RenameDiff {
+  kind: string; // "node label" | "edge type" | "property"
+  where: string; // context: source table, join column, or "Label.column"
+  before: string; // the deterministic name
+  after: string; // the AI's name
+}
+
+// All renames between the deterministic skeleton and its refined version (mirrors
+// the library's MappingDiff). Only names change; SQL identifiers/structure never do.
+export interface MappingDiff {
+  label_renames: RenameDiff[];
+  edge_type_renames: RenameDiff[];
+  property_renames: RenameDiff[];
+}
+
+// /api/build-mapping-stream `done` payload. The structure is always derived
+// deterministically; the LLM naming pass runs only when the request asks to refine.
 export interface GeneratedMapping {
-  mapping_yaml: string; // the AI-refined mapping
+  mapping_yaml: string; // the mapping (AI-refined when refined===true, else deterministic)
   graph: MappingGraph; // structured view of mapping_yaml (for the Graph toggle)
+  skeleton_yaml: string; // the deterministic draft before refinement (the "Original")
+  skeleton_graph: MappingGraph; // structured view of skeleton_yaml
+  diff: MappingDiff | null; // the renames the AI applied; null when refinement was skipped
   report: CoverageReport;
   warnings: string[];
   refined: boolean; // true iff the AI changed the deterministic draft
-  conversation: Message[]; // the AI naming chat
+  conversation: Message[]; // the AI naming chat (empty when refinement was skipped)
+  duration_seconds: number; // wall-clock of the naming pass (0 for a deterministic build)
+  token_usage: TokenUsage; // tokens the naming pass consumed (all-zero when skipped)
 }
 
 export interface Options {

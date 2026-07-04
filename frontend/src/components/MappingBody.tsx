@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Database } from "lucide-react";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { MappingGraph } from "@/components/MappingGraphLazy";
+import type { GraphChanges } from "@/components/MappingGraph";
 import { cls } from "@/components/ui/primitives";
 import type { MappingValidity } from "@/lib/types";
 
@@ -20,6 +21,9 @@ export function MappingBody({
   pane,
   emptyHint,
   theme,
+  highlights,
+  changed,
+  overlay,
 }: {
   yaml: string;
   onChange: (v: string) => void;
@@ -28,6 +32,14 @@ export function MappingBody({
   pane: "yaml" | "graph";
   emptyHint: ReactNode;
   theme: "light" | "dark";
+  // AI-rename highlights (both optional): `highlights` maps each proposed name -> the
+  // original it replaced (green-marked + struck-through in the YAML editor); `changed`
+  // = node labels / edge types to green-ring in the graph.
+  highlights?: Map<string, string>;
+  changed?: GraphChanges;
+  // Absolutely-positioned content floated over the editor/graph viewport (e.g. a
+  // bottom-right action button). Stays put while the YAML scrolls or the graph pans.
+  overlay?: ReactNode;
 }) {
   return (
     <div className="relative min-h-0 flex-1">
@@ -41,6 +53,7 @@ export function MappingBody({
           theme={theme}
           readOnly={readOnly}
           placeholder={MAPPING_PLACEHOLDER}
+          highlights={highlights}
         />
         {!yaml.trim() && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
@@ -56,12 +69,13 @@ export function MappingBody({
           updates as the YAML is edited and only when valid. */}
       {pane === "graph" &&
         (validity?.graph ? (
-          <MappingGraph graph={validity.graph} theme={theme} />
+          <MappingGraph graph={validity.graph} theme={theme} changed={changed} />
         ) : (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400 dark:text-slate-500">
             {yaml.trim() ? "Fix the mapping errors to see the graph." : "Add a mapping to see its graph."}
           </div>
         ))}
+      {overlay}
     </div>
   );
 }

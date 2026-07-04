@@ -266,11 +266,21 @@ export function Chip({
 
 // Fixed-height (h-9) header for an editor pane. The fixed height (not padding)
 // is what keeps two side-by-side panes aligned whether or not they carry an
-// action in the right-hand `children` slot.
-export function PaneHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
+// action in the right-hand `children` slot. The optional `center` slot is absolutely
+// centered in the bar (independent of the title/actions widths).
+export function PaneHeader({
+  title,
+  center,
+  children,
+}: {
+  title: ReactNode;
+  center?: ReactNode;
+  children?: ReactNode;
+}) {
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between gap-1 border-b border-slate-200 px-3 dark:border-slate-700">
+    <div className="relative flex h-9 shrink-0 items-center justify-between gap-1 border-b border-slate-200 px-3 dark:border-slate-700">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</span>
+      {center && <div className="absolute left-1/2 -translate-x-1/2">{center}</div>}
       {children}
     </div>
   );
@@ -316,6 +326,53 @@ export function SegmentedControl<T extends string>({
         );
       })}
     </div>
+  );
+}
+
+// A labelled on/off switch (a pill track with a sliding thumb): indigo when on, slate
+// when off. Distinct from SegmentedControl (a one-of switch) - this is a single boolean.
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+  title,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: ReactNode;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      title={title}
+      onClick={() => onChange(!checked)}
+      className={cls(
+        // h-8 matches the adjacent Button box so the row's items-center truly centers it.
+        "inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
+        checked ? "text-indigo-600 dark:text-indigo-300" : "text-slate-500 dark:text-slate-400",
+      )}
+    >
+      <span
+        className={cls(
+          "relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors",
+          checked ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-600",
+        )}
+      >
+        <span
+          className={cls(
+            "inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform",
+            checked ? "translate-x-3.5" : "translate-x-0.5",
+          )}
+        />
+      </span>
+      {label && <span className="whitespace-nowrap">{label}</span>}
+    </button>
   );
 }
 

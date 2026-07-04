@@ -44,16 +44,23 @@ def _build_result_to_dict(result: BuildResult) -> dict[str, Any]:
     """Shape a library :class:`BuildResult` into the JSON the build endpoint returns.
 
     ``graph`` is the structured node/edge view (the same shape as ``SchemaMapping``)
-    so the web UI can draw the mapping without a YAML parser. The deterministic
-    "skeleton" and the rename ``diff`` are intentionally omitted: the modal always
-    applies the AI-refined result and no longer compares the two versions."""
+    so the web UI can draw the mapping without a YAML parser. ``skeleton_graph`` is the
+    same structured view of the pre-refinement deterministic draft, so the UI can show
+    an "Original" toggle, and ``diff`` describes the renames the LLM applied so the UI
+    can highlight them. When the naming pass was skipped (deterministic build), ``diff``
+    is ``None`` and ``skeleton_*`` equals the main mapping."""
     return {
         "mapping_yaml": result.yaml,
         "graph": result.mapping.model_dump(),
+        "skeleton_yaml": result.skeleton_yaml,
+        "skeleton_graph": SchemaMapping.from_yaml_string(result.skeleton_yaml).model_dump(),
+        "diff": result.diff.as_dict() if result.diff is not None else None,
         "report": result.report.as_dict(),
         "warnings": result.warnings,
         "refined": result.refined,
         "conversation": result.conversation,
+        "token_usage": result.token_usage.model_dump(),
+        "duration_seconds": result.duration_seconds,
     }
 
 
@@ -91,18 +98,23 @@ async def build_mapping_from_ddl_async(
     *,
     dialect: str | None = None,
     llm: LlmSettings,
+    refine: bool = True,
     on_conversation: ConversationCallback | None = None,
 ) -> dict[str, Any]:
     """Generate a schema-mapping draft from CREATE TABLE DDL via the library.
 
-    The structure is derived deterministically and an LLM always improves the
-    node/edge names, running through the same model factory as translation (and the
-    same backend env, e.g. ``ANTHROPIC_API_KEY``). That pass is guarded by the
-    library, so a failed refinement simply returns the deterministic mapping with a
-    warning. Its conversation is streamed via *on_conversation* (the SSE bridge
-    consumes it). Raises the library's ``DdlParseError`` (a ``ValueError``) on
-    unparseable DDL, which the API surfaces as HTTP 400.
+    The structure is always derived deterministically. When *refine* is true an LLM
+    additionally improves the node/edge names, running through the same model factory
+    as translation (and the same backend env, e.g. ``ANTHROPIC_API_KEY``); that pass is
+    guarded by the library, so a failed refinement simply returns the deterministic
+    mapping with a warning, and its conversation is streamed via *on_conversation* (the
+    SSE bridge consumes it). When *refine* is false no model is built or called and the
+    deterministic draft is returned as-is. Raises the library's ``DdlParseError`` (a
+    ``ValueError``) on unparseable DDL, which the API surfaces as HTTP 400.
     """
+    if not refine:
+        result = await build_mapping_async(ddl=ddl, dialect=dialect, llm=None)
+        return _build_result_to_dict(result)
     client = make_async_llm(build_model_config(llm))
     try:
         result = await build_mapping_async(ddl=ddl, dialect=dialect, llm=client, on_conversation=on_conversation)

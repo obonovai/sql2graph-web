@@ -142,13 +142,15 @@ async def stream_build_mapping(
     ddl: str,
     dialect: str | None,
     llm_settings: LlmSettings,
+    refine: bool = True,
 ) -> AsyncIterator[dict[str, str]]:
     """Yield SSE events for one mapping build with live refinement streaming.
 
-    Same coalescing pattern as :func:`stream`: the refinement's per-token
-    ``on_conversation`` snapshots are flushed at most once per tick as
-    ``conversation`` events, then a final ``done`` event carries the full result
-    dict (or an ``error`` event on failure).
+    Same coalescing pattern as :func:`stream`: when *refine* is true the refinement's
+    per-token ``on_conversation`` snapshots are flushed at most once per tick as
+    ``conversation`` events; a final ``done`` event carries the full result dict (or an
+    ``error`` event on failure). When *refine* is false no conversation is emitted (the
+    build is deterministic) and only the ``done`` event fires.
     """
     queue: asyncio.Queue[dict[str, str] | None] = asyncio.Queue()
     latest_conversation: list[dict[str, str]] | None = None
@@ -162,7 +164,7 @@ async def stream_build_mapping(
     async def runner() -> None:
         try:
             result = await library.build_mapping_from_ddl_async(
-                ddl, dialect=dialect, llm=llm_settings, on_conversation=on_conversation
+                ddl, dialect=dialect, llm=llm_settings, refine=refine, on_conversation=on_conversation
             )
             queue.put_nowait(_sse("done", result))
         except asyncio.CancelledError:

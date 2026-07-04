@@ -36,6 +36,27 @@ body {
   animation: blink 1s step-end infinite;
 }
 
+/* Green highlight for the AI's proposed (renamed) identifiers in the mapping YAML
+   editor, with the deterministic name it replaced shown struck through beside it. */
+.cm-ai-changed {
+  background-color: rgb(220 252 231); /* green-100 */
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.dark .cm-ai-changed {
+  background-color: rgb(20 83 45 / 0.55); /* green-900/55 */
+}
+.cm-ai-old {
+  text-decoration: line-through;
+  color: rgb(148 163 184); /* slate-400 */
+  /* Gap before the old name as margin (outside the text box) so the strikethrough
+     line does not extend across it. */
+  margin-left: 5px;
+}
+.dark .cm-ai-old {
+  color: rgb(100 116 139); /* slate-500 */
+}
+
 /* Hide the native number spinner; we provide our own +/- stepper buttons. */
 .no-spinner::-webkit-outer-spin-button,
 .no-spinner::-webkit-inner-spin-button {

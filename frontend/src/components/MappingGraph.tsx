@@ -33,9 +33,16 @@ function colorFor(label: string): string {
   return PALETTE[h % PALETTE.length];
 }
 
-function toElements(graph: MappingGraphData): ElementDefinition[] {
+// Node labels / edge types the AI renamed (or that own a renamed property); ringed green.
+export interface GraphChanges {
+  nodeLabels: Set<string>;
+  edgeTypes: Set<string>;
+}
+
+function toElements(graph: MappingGraphData, changed?: GraphChanges): ElementDefinition[] {
   const nodes: ElementDefinition[] = graph.nodes.map((node) => ({
     data: { id: node.label, label: node.label, color: colorFor(node.label), node },
+    classes: changed?.nodeLabels.has(node.label) ? "changed" : undefined,
   }));
   const edges: ElementDefinition[] = graph.edges.map((edge, i) => ({
     data: {
@@ -45,6 +52,7 @@ function toElements(graph: MappingGraphData): ElementDefinition[] {
       label: edge.type,
       edge,
     },
+    classes: changed?.edgeTypes.has(edge.type) ? "changed" : undefined,
   }));
   return [...nodes, ...edges];
 }
@@ -74,6 +82,9 @@ function stylesheet(theme: "light" | "dark"): cytoscape.StylesheetCSS[] {
         "text-max-width": "52px",
       },
     },
+    // AI-renamed nodes/edges get a green ring (green-500), before :selected so a
+    // selection still overrides it visually.
+    { selector: "node.changed", style: { "border-width": 4, "border-color": "#22c55e" } },
     { selector: "node:selected", style: { "border-width": 4, "border-color": selected } },
     {
       selector: "edge",
@@ -92,6 +103,10 @@ function stylesheet(theme: "light" | "dark"): cytoscape.StylesheetCSS[] {
         "text-background-padding": "2px",
         "text-rotation": "autorotate",
       },
+    },
+    {
+      selector: "edge.changed",
+      style: { width: 3, "line-color": "#22c55e", "target-arrow-color": "#22c55e" },
     },
     {
       selector: "edge:selected",
@@ -116,7 +131,15 @@ const FCOSE_LAYOUT = {
 
 type Selection = { kind: "node"; data: GraphNode } | { kind: "edge"; data: GraphEdge } | null;
 
-export function MappingGraph({ graph, theme }: { graph: MappingGraphData; theme: "light" | "dark" }) {
+export function MappingGraph({
+  graph,
+  theme,
+  changed,
+}: {
+  graph: MappingGraphData;
+  theme: "light" | "dark";
+  changed?: GraphChanges;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const [selected, setSelected] = useState<Selection>(null);
@@ -126,8 +149,14 @@ export function MappingGraph({ graph, theme }: { graph: MappingGraphData; theme:
   // want to rebuild + relayout when the actual nodes/edges change (so editing a
   // comment doesn't reshuffle the graph).
   const signature = useMemo(() => JSON.stringify(graph), [graph]);
+  // Fold the green-ring sets into the rebuild key so toggling highlights re-tags.
+  const changedKey = useMemo(
+    () =>
+      changed ? `${[...changed.nodeLabels].sort().join(",")}|${[...changed.edgeTypes].sort().join(",")}` : "",
+    [changed],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const elements = useMemo(() => toElements(graph), [signature]);
+  const elements = useMemo(() => toElements(graph, changed), [signature, changedKey]);
 
   // (Re)build the Cytoscape instance when the graph's elements change.
   useEffect(() => {
@@ -176,11 +205,6 @@ export function MappingGraph({ graph, theme }: { graph: MappingGraphData; theme:
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
       <InspectorPanel selection={selected} onClose={() => setSelected(null)} />
-      {!selected && (
-        <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-white/80 px-2 py-1 text-[11px] text-slate-500 shadow-sm dark:bg-slate-800/80 dark:text-slate-400">
-          Drag to move, scroll to zoom, click a node or relationship for details
-        </div>
-      )}
     </div>
   );
 }

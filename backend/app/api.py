@@ -159,20 +159,23 @@ def _format_validation_errors(exc: ValidationError) -> list[str]:
 
 @router.post("/build-mapping-stream")
 async def build_mapping_stream(body: BuildMappingBody) -> EventSourceResponse:
-    """SSE: stream the LLM naming conversation, then a final ``done`` result.
+    """SSE: (optionally) stream the LLM naming conversation, then a final ``done`` result.
 
-    The structure is derived deterministically and the LLM naming pass always runs;
-    its conversation streams as ``conversation`` events, then ``done`` carries the
-    generated mapping (or ``error`` on failure). Invalid model config or empty DDL
-    surface as HTTP 400 before streaming starts, the same contract as ``/translate``.
+    The structure is derived deterministically. When ``refine`` is true the LLM naming
+    pass runs and its conversation streams as ``conversation`` events; then ``done``
+    carries the generated mapping (or ``error`` on failure). When ``refine`` is false no
+    model is called and only ``done`` fires. Empty DDL, and an invalid model config when
+    refining, surface as HTTP 400 before streaming starts (the same contract as
+    ``/translate``); a deterministic build does not require a valid model config.
     """
     if not body.ddl.strip():
         raise HTTPException(status_code=400, detail="DDL is empty.")
-    try:
-        library.build_model_config(body.llm)  # surface invalid model config as 400
-    except (ValidationError, ValueError, TypeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return EventSourceResponse(stream_build_mapping(body.ddl, body.dialect, body.llm))
+    if body.refine:
+        try:
+            library.build_model_config(body.llm)  # surface invalid model config as 400
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return EventSourceResponse(stream_build_mapping(body.ddl, body.dialect, body.llm, body.refine))
 
 
 @router.post("/detect-features")

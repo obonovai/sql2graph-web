@@ -92,10 +92,14 @@ class CoverageBody(BaseModel):
 class BuildMappingBody(BaseModel):
     """Request for generating a schema mapping from CREATE TABLE DDL.
 
-    The structure is derived deterministically and the LLM naming pass always runs,
-    reusing the same ``llm`` settings (and backend environment) as translation.
+    The structure is always derived deterministically. When ``refine`` is true the LLM
+    naming pass additionally runs, reusing the same ``llm`` settings (and backend
+    environment) as translation; when false the deterministic draft is returned as-is
+    with no model call. ``llm`` is always accepted (the form sends it) but ignored when
+    ``refine`` is false.
     """
 
     ddl: str
     dialect: str | None = None
     llm: LlmSettings
+    refine: bool = True

@@ -54,13 +54,13 @@ export async function checkCoverage(sql: string, mapping_yaml: string, dialect: 
 class FatalSseError extends Error {}
 
 /**
- * Open the build-mapping stream. The structure is derived deterministically and the
- * LLM naming pass always runs: streams `conversation` snapshots, then a final `done`
- * (the full GeneratedMapping) or `error`. Pass an AbortSignal so the modal can cancel
- * on close.
+ * Open the build-mapping stream. The structure is derived deterministically; when
+ * `refine` is true the LLM naming pass also runs, streaming `conversation` snapshots.
+ * Either way a final `done` (the full GeneratedMapping) or `error` follows. Pass an
+ * AbortSignal so the modal can cancel on close.
  */
 export function buildMappingStream(
-  req: { ddl: string; dialect: string | null; llm: LlmSettings },
+  req: { ddl: string; dialect: string | null; llm: LlmSettings; refine: boolean },
   handlers: {
     signal: AbortSignal;
     onConversation: (messages: Message[]) => void;

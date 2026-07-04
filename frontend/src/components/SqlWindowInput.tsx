@@ -70,10 +70,6 @@ export function SqlWindowInput() {
         <div className="ml-auto flex items-center gap-2 pr-2">
           {sqlInner === "mapping" ? (
             <>
-              <IconButton onClick={() => yamlRef.current?.click()} title="Upload .yaml">
-                <Upload className="h-4 w-4" />
-              </IconButton>
-              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <SegmentedControl
                 value={pane}
                 onChange={setPane}
@@ -83,6 +79,10 @@ export function SqlWindowInput() {
                 ]}
                 ariaLabel="Mapping view"
               />
+              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
+              <IconButton onClick={() => yamlRef.current?.click()} title="Upload .yaml">
+                <Upload className="h-4 w-4" />
+              </IconButton>
             </>
           ) : (
             <IconButton onClick={() => sqlRef.current?.click()} title="Upload .sql">

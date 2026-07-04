@@ -1,6 +1,6 @@
-import { ArrowRight, ChevronRight, Eraser, Play, Square } from "lucide-react";
+import { ChevronRight, Eraser, Play, Square } from "lucide-react";
 import { RUNNING_STATUSES, useStore } from "@/hooks/useStore";
-import { Button, Tab } from "@/components/ui/primitives";
+import { Button, Tab, Toggle } from "@/components/ui/primitives";
 
 // The bar directly above the window: the two workspace-stage tabs (left, no dots -
 // the per-mapping status dots live on the SQL window's inner document tabs) + the
@@ -32,17 +32,28 @@ export function WorkspaceBar() {
 
 function MappingActions() {
   const ddl = useStore((s) => s.form.ddl);
-  const draftYaml = useStore((s) => s.form.draftMappingYaml);
+  const refineWithLlm = useStore((s) => s.form.refineWithLlm);
+  const setRefineWithLlm = useStore((s) => s.setRefineWithLlm);
   const status = useStore((s) => s.build.status);
   const buildMapping = useStore((s) => s.buildMapping);
   const stopBuild = useStore((s) => s.stopBuild);
-  const useThisMapping = useStore((s) => s.useThisMapping);
   const clearMapping = useStore((s) => s.clearMapping);
 
   const loading = status === "loading";
 
   return (
     <>
+      <Toggle
+        checked={refineWithLlm}
+        onChange={setRefineWithLlm}
+        disabled={loading}
+        title={
+          refineWithLlm
+            ? "AI polishes node/edge names after generating, and shows what it changed"
+            : "Generate a deterministic mapping only (no AI, no model call)"
+        }
+        label="Refine with AI"
+      />
       {loading ? (
         <Button variant="danger" onClick={stopBuild}>
           <Square className="h-4 w-4" /> Stop
@@ -57,14 +68,6 @@ function MappingActions() {
           <Play className="h-4 w-4" /> Generate
         </Button>
       )}
-      <Button
-        variant="primary"
-        onClick={useThisMapping}
-        disabled={!draftYaml.trim()}
-        title="Copy this mapping to the SQL window and switch there"
-      >
-        Use this mapping <ArrowRight className="h-4 w-4" />
-      </Button>
       <Button variant="default" onClick={clearMapping} disabled={loading} title="Clear the DDL and draft mapping">
         <Eraser className="h-4 w-4" /> Clear
       </Button>
