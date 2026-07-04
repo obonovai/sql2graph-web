@@ -1,0 +1,40 @@
+# Single-container deployment: the FastAPI backend serves both the built SPA and
+# the /api routes on one origin (http://localhost:8000). The sql2graph library is
+# pulled in from the sibling repo as a named build context, so BOTH repos must be
+# cloned side by side (see INSTALL.md). Run from this directory:
+#
+#     cp .env.example .env      # then fill in ANTHROPIC_API_KEY and/or OLLAMA_HOST
+#     docker compose up --build
+#
+# additional_contexts (map form) requires Compose v2.17+ / BuildKit.
+name: sql2graph-web
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      additional_contexts:
+        library: ../sql2graph        # the sibling sql2graph library repo
+    image: sql2graph-web:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # Secrets/config are injected at runtime, never baked into the image.
+      # Compose auto-loads ./.env for these ${...} substitutions.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-}
+      # Point the backend at the vendored library data dirs (see Dockerfile layout).
+      SQL2GRAPH_CONFIG_DIR: /app/sql2graph/config
+      SQL2GRAPH_EXAMPLES_DIR: /app/sql2graph/examples
+    # To reach an Ollama server running on the Docker host, set
+    # OLLAMA_HOST=http://host.docker.internal:11434. On Linux, also uncomment:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped

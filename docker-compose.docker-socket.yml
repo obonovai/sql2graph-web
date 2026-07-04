@@ -1,0 +1,34 @@
+# Opt-in overlay: auto-provisioned throwaway databases for empty-config `server`
+# validation. It gives the app container access to the host Docker daemon so the
+# sql2graph library's `managed` validator can spin up a disposable Neo4j / ArangoDB /
+# Gremlin via testcontainers, run validation against it, and tear it down afterward.
+#
+# Trade-offs (LOCAL DEVELOPMENT ONLY): the app runs as root and can control the
+# host's Docker daemon. Do not use this overlay in a shared or production deployment;
+# there, provide an explicit connection to a real database instead.
+#
+# Enable (note the two -f flags):
+#   docker compose -f docker-compose.yml -f docker-compose.docker-socket.yml up -d
+# Go back to the plain, non-root app:
+#   docker compose up -d
+services:
+  app:
+    # Root is required to access the mounted Docker socket.
+    user: "0:0"
+    volumes:
+      # Docker-out-of-docker: let testcontainers drive the host daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # host.docker.internal is auto-resolved on Docker Desktop; this line makes the
+    # overlay work on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # A throwaway DB publishes its ports on the Docker HOST, so the app container
+      # must reach it via the host, not its own localhost. The library's provisioners
+      # build their connection URLs from this override.
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+      # The library stops its own throwaway containers after validation, so the
+      # testcontainers reaper (Ryuk) is redundant here; disabling it avoids a class
+      # of docker-out-of-docker startup failures. A hard kill of the app mid-run
+      # could then leave a stray DB container (remove it with `docker rm -f`).
+      TESTCONTAINERS_RYUK_DISABLED: "true"

@@ -1,0 +1,28 @@
+# Python
+**/__pycache__/
+**/*.pyc
+backend/.venv/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.pytest_cache/
+
+# Node / build artifacts (the frontend stage rebuilds these)
+frontend/node_modules/
+frontend/dist/
+
+# Docs and build config not needed inside the image
+**/*.md
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# VCS / editors / OS
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+
+# Secrets and local env: never send to the build
+.env
+.env.*

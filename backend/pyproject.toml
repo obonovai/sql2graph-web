@@ -2,6 +2,7 @@
 name = "sql2graph-web-backend"
 version = "0.1.0"
 description = "FastAPI backend that wraps the sql2graph library for the web UI."
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "sql2graph",
