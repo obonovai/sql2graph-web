@@ -16,13 +16,16 @@ from sql2graph import (
     VALID_TARGETS,
     VALID_VALIDATION_MODES,
     ArangoDBConfig,
+    DdlParseError,
     GremlinConfig,
     Neo4jConfig,
     SchemaMapping,
     analyze_sql,
+    extract_schema_from_ddl,
+    find_unmapped_columns,
+    find_unmapped_tables,
     valid_modes_for_target,
 )
-from sql2graph.preflight import find_unmapped_columns, find_unmapped_tables
 from sse_starlette.sse import EventSourceResponse
 
 from . import library, presets
@@ -164,12 +167,17 @@ async def build_mapping_stream(body: BuildMappingBody) -> EventSourceResponse:
     The structure is derived deterministically. When ``refine`` is true the LLM naming
     pass runs and its conversation streams as ``conversation`` events; then ``done``
     carries the generated mapping (or ``error`` on failure). When ``refine`` is false no
-    model is called and only ``done`` fires. Empty DDL, and an invalid model config when
-    refining, surface as HTTP 400 before streaming starts (the same contract as
-    ``/translate``); a deterministic build does not require a valid model config.
+    model is called and only ``done`` fires. Empty DDL, unparseable DDL
+    (``DdlParseError``), and an invalid model config when refining all surface as HTTP
+    400 before streaming starts (the same contract as ``/translate``); a deterministic
+    build does not require a valid model config.
     """
     if not body.ddl.strip():
         raise HTTPException(status_code=400, detail="DDL is empty.")
+    try:
+        extract_schema_from_ddl(body.ddl, dialect=body.dialect)  # surface unparseable DDL as 400
+    except DdlParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if body.refine:
         try:
             library.build_model_config(body.llm)  # surface invalid model config as 400
