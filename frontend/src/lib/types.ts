@@ -81,7 +81,7 @@ export interface TranslationResult {
 export interface GraphNode {
   label: string; // node label (also its unique id; edges reference it)
   source_table: string;
-  primary_key: string;
+  primary_key: string | string[]; // one or more columns (composite key); mirrors the library's model_dump
   properties: Record<string, string>; // graph property name -> SQL column
   // graph property name -> semantic type (date/datetime/integer/...). Optional and
   // sparse: only typed properties appear. Optional so payloads from an editable
@@ -94,8 +94,8 @@ export interface GraphEdge {
   source_node: string; // a GraphNode.label
   target_node: string; // a GraphNode.label
   source_table: string;
-  source_foreign_key: string;
-  target_primary_key: string;
+  source_foreign_key: string | string[]; // one or more columns; positionally matched to target_primary_key
+  target_primary_key: string | string[];
   properties: Record<string, string>;
   property_types?: Record<string, string>; // same as GraphNode.property_types
 }

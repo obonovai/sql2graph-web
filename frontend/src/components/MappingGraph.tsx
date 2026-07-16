@@ -230,12 +230,25 @@ function InspectorPanel({ selection, onClose }: { selection: Selection; onClose:
   );
 }
 
+function fmtKey(key: string | string[]): string {
+  // The library serialises a key as a bare string (one column) or an array
+  // (composite key); render either as a comma-separated list.
+  return Array.isArray(key) ? key.join(", ") : key;
+}
+
+function fmtJoin(fk: string | string[], pk: string | string[]): string {
+  // Pair join columns positionally: `a = x AND b = y` for a composite join.
+  const fks = Array.isArray(fk) ? fk : [fk];
+  const pks = Array.isArray(pk) ? pk : [pk];
+  return fks.map((col, i) => `${col} = ${pks[i]}`).join(" AND ");
+}
+
 function NodeDetails({ node }: { node: GraphNode }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{node.label}</div>
       <Meta label="table" value={node.source_table} />
-      <Meta label="primary key" value={node.primary_key} />
+      <Meta label="primary key" value={fmtKey(node.primary_key)} />
       <PropList title="properties" properties={node.properties} propertyTypes={node.property_types} />
     </div>
   );
@@ -247,7 +260,7 @@ function EdgeDetails({ edge }: { edge: GraphEdge }) {
       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{edge.type}</div>
       <Meta label="from / to" value={`${edge.source_node} to ${edge.target_node}`} />
       <Meta label="table" value={edge.source_table} />
-      <Meta label="join" value={`${edge.source_foreign_key} = ${edge.target_primary_key}`} />
+      <Meta label="join" value={fmtJoin(edge.source_foreign_key, edge.target_primary_key)} />
       <PropList title="properties" properties={edge.properties} propertyTypes={edge.property_types} />
     </div>
   );
