@@ -490,8 +490,8 @@ export const useStore = create<Store>()(
                   st.unmappedTables = ev.data.tables;
                   break;
                 case "unmapped_columns":
-                  // Warn by default (translation continues); a reject would
-                  // additionally arrive as finalStatus on `completed`.
+                  // A reject by default: the LLM is skipped and `completed`
+                  // follows with the terminal status (a warn-configured run continues).
                   st.unmappedColumns = ev.data.columns;
                   break;
                 case "conversation":

@@ -1,14 +1,21 @@
-# Installing sql2graph-web
+# Install and run
 
 **Set up the web UI for local development, as a production build, or with Docker.**
 
-`sql2graph-web` is a thin browser front end over the
-[`sql2graph`](https://github.com/obonovai/sql2graph) library. The two live in separate
-repositories that must be cloned side by side:
-the backend installs the library from the sibling directory and reads its `config/`
-and `examples/` at runtime, and the built SPA is served by the backend from one
-origin. This guide covers the prerequisites, the required repository layout, and
-three ways to run the app.
+## Scope
+
+This page owns: prerequisites, the sibling-clone repository layout, the three
+run paths (manual development, production build, Docker), the throwaway-database
+overlay, the environment-variable table, the check and build commands, and
+troubleshooting. Related topics live with their owners:
+
+- [architecture.md](architecture.md): the mental model; the one-origin topology
+  these run paths produce.
+- [api.md](api.md): the REST and SSE endpoints once the app is running.
+- [../README.md](../README.md): the project overview; [README.md](README.md):
+  the full doc map.
+
+---
 
 ## Prerequisites
 
@@ -23,6 +30,12 @@ The backend targets Python `>=3.12`; `uv` fetches a matching interpreter for you
 You do not need `pip` or a manual `virtualenv`.
 
 ## Repository layout (clone both repos as siblings)
+
+`sql2graph-web` is a thin browser front end over the
+[`sql2graph`](https://github.com/obonovai/sql2graph) library. The two live in
+separate repositories that must be cloned side by side: the backend installs the
+library from the sibling directory and reads its `config/` and `examples/` at
+runtime, and the built SPA is served by the backend from one origin.
 
 Clone the library and the web UI into the **same parent directory**, and keep the
 library directory named exactly `sql2graph`:
@@ -41,12 +54,12 @@ git clone https://github.com/obonovai/sql2graph-web.git  sql2graph-web
 
 This layout is not optional. Three fixed paths depend on it:
 
-- `backend/pyproject.toml` installs the library from `../../sql2graph`
+- `backend/pyproject.toml:23-24` installs the library from `../../sql2graph`
   (`[tool.uv.sources]`), so `uv sync` fails if the sibling is missing or renamed.
-- `backend/app/presets.py` resolves the library `config/` and `examples/` dirs as
-  `parents[3]/sql2graph/...` (overridable with `SQL2GRAPH_CONFIG_DIR` /
-  `SQL2GRAPH_EXAMPLES_DIR`).
-- `backend/app/main.py` mounts the built SPA from `parents[2]/frontend/dist`.
+- `backend/app/presets.py:37` and `backend/app/presets.py:45` resolve the library
+  `config/` and `examples/` dirs as `parents[3]/sql2graph/...` (overridable with
+  `SQL2GRAPH_CONFIG_DIR` / `SQL2GRAPH_EXAMPLES_DIR`).
+- `backend/app/main.py:31-33` mounts the built SPA from `parents[2]/frontend/dist`.
 
 Renaming or nesting the library directory breaks `import sql2graph` and the preset
 mappings. See [Troubleshooting](#troubleshooting).
@@ -102,7 +115,7 @@ cp .env.example .env                # then fill in ANTHROPIC_API_KEY and/or OLLA
 docker compose up --build
 
 # Or, to also allow empty-config `server` validation to auto-provision throwaway
-# databases (docker-out-of-docker; the app runs as root -- local development only):
+# databases (docker-out-of-docker; the app runs as root, local development only):
 docker compose -f docker-compose.yml -f docker-compose.docker-socket.yml up --build
 ```
 
@@ -120,7 +133,7 @@ Open http://localhost:8000. Notes:
   database (a database on your Mac is reached via `host.docker.internal`), or enable
   the docker-socket overlay below to let the backend provision throwaway databases.
 
-### Throwaway databases (empty-config `server` validation)
+## Throwaway databases (empty-config `server` validation)
 
 Picking `server` validation and leaving the connection blank makes the library
 auto-provision a disposable Neo4j / ArangoDB / Gremlin via testcontainers. That needs
@@ -136,21 +149,26 @@ docker compose -f docker-compose.yml -f docker-compose.docker-socket.yml up -d
 ```
 
 Then select `server`, leave the connection blank, and translate; the first run pulls
-the database image and boots it (10-40s). The overlay runs the app as **root**, mounts
-`/var/run/docker.sock`, and sets `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal` so
-the app container can reach the throwaway database's published port on the host. Use it
-for **local development only** — for a shared or production deployment, provide an
-explicit connection to a real database instead. Return to the plain, non-root app with
-`docker compose up -d`.
+the database image and boots it (10 to 40 seconds). The overlay runs the app as
+**root**, mounts `/var/run/docker.sock`, and sets
+`TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal` so the app container can reach
+the throwaway database's published port on the host. Use it for **local development
+only**: for a shared or production deployment, provide an explicit connection to a
+real database instead. Return to the plain, non-root app with `docker compose up -d`.
 
 ## Environment variables and secrets
 
 | Variable | Used by | Notes |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Anthropic SDK on the backend | Never entered in the browser. |
-| `OLLAMA_HOST` | Backend | Default Ollama endpoint when the sidebar host is blank. |
-| `SQL2GRAPH_CONFIG_DIR` | Backend | Override the library `config/` dir (model defaults). |
-| `SQL2GRAPH_EXAMPLES_DIR` | Backend | Override the library `examples/` dir (preset mappings). |
+| `OLLAMA_HOST` | Backend | Default Ollama endpoint when the sidebar host override is blank. |
+| `SQL2GRAPH_CONFIG_DIR` | Backend | Override the library `config/` dir used for model-field defaults. Defaults to the sibling `../sql2graph/config`. |
+| `SQL2GRAPH_EXAMPLES_DIR` | Backend | Override the library `examples/` dir used for preset mappings. Defaults to the sibling `../sql2graph/examples`. |
+
+The two directory defaults resolve to the `../../sql2graph` sibling layout
+(`parents[3]/sql2graph/...` relative to `app/presets.py`; see
+`backend/app/presets.py:37` and `backend/app/presets.py:45`). When that layout is
+not preserved (for example inside a container), set both variables explicitly.
 
 The backend reads these from the process environment; it does not load a `.env`
 file itself. In development, `export` them (Path A) or `source` your own env file
@@ -162,6 +180,25 @@ keeps `.env.example`). The library repo keeps its own separate `.env` with real
 secrets; it is used only when running the library directly and is not consumed by
 this app.
 
+## Checks and builds
+
+Backend lint and type checks, from `backend/` after `uv sync`:
+
+```bash
+uv run ruff check app
+uv run mypy app
+```
+
+Frontend develop and build, from `frontend/` after `npm install`:
+
+```bash
+npm run dev      # http://localhost:5173, proxies /api -> http://localhost:8000
+npm run build    # tsc --noEmit && vite build -> dist/  (served by the backend in prod / Docker)
+```
+
+`npm run dev` needs the backend already running on `:8000` for the `/api` proxy
+calls to succeed.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -172,9 +209,3 @@ this app.
 | Docker: "context escapes" / library not found | Compose run from the wrong dir, or the sibling is missing. | Run `docker compose up --build` from `sql2graph-web/` with `../sql2graph` present. |
 | Ollama unreachable from the container | `localhost` inside the container is the container itself. | Use `OLLAMA_HOST=http://host.docker.internal:11434` (or an `ollama` service). |
 | `server` validation blocked ("needs Docker on the backend; none detected") | No Docker daemon reachable from the backend (e.g. inside the container). | Enter an explicit connection to a running database, or enable the [docker-socket overlay](#throwaway-databases-empty-config-server-validation). |
-
-## See also
-
-- [`README.md`](README.md) — architecture, validation modes, and the API surface.
-- [`backend/README.md`](backend/README.md) — the FastAPI app internals.
-- [`frontend/README.md`](frontend/README.md) — the SPA structure and state model.

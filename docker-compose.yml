@@ -1,7 +1,7 @@
 # Single-container deployment: the FastAPI backend serves both the built SPA and
 # the /api routes on one origin (http://localhost:8000). The sql2graph library is
 # pulled in from the sibling repo as a named build context, so BOTH repos must be
-# cloned side by side (see INSTALL.md). Run from this directory:
+# cloned side by side (see docs/install.md). Run from this directory:
 #
 #     cp .env.example .env      # then fill in ANTHROPIC_API_KEY and/or OLLAMA_HOST
 #     docker compose up --build

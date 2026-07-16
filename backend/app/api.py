@@ -204,8 +204,8 @@ def detect(body: SqlBody) -> dict[str, Any]:
 def check_coverage(body: CoverageBody) -> dict[str, Any]:
     """Live pre-flight: which SQL tables/columns are absent from the mapping.
 
-    Mirrors the translator's unmapped-tables (reject by default) and
-    unmapped-columns (warn by default) checks so the UI can flag the problem
+    Mirrors the translator's unmapped-tables and unmapped-columns checks
+    (both reject by default) so the UI can flag the problem
     before the user clicks Translate. Fails soft: an empty/unparseable SQL or an
     invalid mapping yields empty lists (the mapping editor's own
     ``/validate-mapping`` indicator reports YAML errors).

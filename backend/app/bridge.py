@@ -2,7 +2,7 @@
 
 The library invokes ``on_event`` and ``on_conversation`` synchronously, on the
 same event-loop task that runs ``translate()`` (see
-``sql2graph/src/sql2graph/async_translator.py``). So the bridge is simple:
+``sql2graph/src/sql2graph/engine/async_translator.py``). So the bridge is simple:
 
 * milestone events go onto an ``asyncio.Queue`` via ``put_nowait`` (never await,
   never a threading queue) and are forwarded immediately;

@@ -19,26 +19,21 @@ single-page app, so the whole thing runs on one origin.
 
 ## Architecture
 
-- **Backend** (`backend/`, FastAPI): builds the library's own config objects from the
-  request, runs `AsyncSQLTranslator.translate(...)`, and bridges its `on_conversation`
-  and `on_event` callbacks to **Server-Sent Events** via an `asyncio.Queue`.
-  Conversation snapshots (which fire per token and resend the whole transcript) are
-  coalesced to ~12 fps; the translator runs inside `async with` so the LLM client, DB
-  connections, and any throwaway managed DB are torn down on completion or client
-  disconnect. See [`backend/README.md`](backend/README.md).
-- **Frontend** (`frontend/`, Vite + React + TypeScript): a three-column shell, with a
-  collapsible Settings sidebar, a center workbench, and a collapsible live Chat
-  sidebar. The center stacks a header, a run-setup bar (target + Translate), and a
-  resizable Inputs / Result split: the inputs pane carries the schema mapping (YAML)
-  and SQL as co-equal tabs, the result pane shows the generated query plus the run
-  outcome. The API base is a hardcoded relative `/api`, so production must be
-  same-origin (Vite proxies it in development). See
-  [`frontend/README.md`](frontend/README.md).
+The backend (`backend/`, FastAPI) is a thin bridge: it builds the library's own
+config objects from the request, runs `AsyncSQLTranslator.translate(...)`, and
+forwards the library's callbacks to the browser as Server-Sent Events. The
+frontend (`frontend/`, Vite + React + TypeScript) is a three-column SPA: a
+collapsible Settings sidebar, a center workbench with the mapping / SQL inputs
+and the result, and a collapsible live Chat sidebar. Its API base is a hardcoded
+relative `/api`, so production must be same-origin (Vite proxies it in
+development). The full mental model lives in
+[`docs/architecture.md`](docs/architecture.md), and the SSE pipeline is covered
+in [`docs/streaming.md`](docs/streaming.md).
 
 ## Prerequisites
 
 - The `sql2graph` library, cloned as a **sibling directory** named `sql2graph` (the
-  backend installs it editable from `../../sql2graph`). See [`INSTALL.md`](INSTALL.md).
+  backend installs it editable from `../../sql2graph`). See [`docs/install.md`](docs/install.md).
 - Python `>=3.12` and [`uv`](https://docs.astral.sh/uv/) for the backend.
 - Node.js 22 (Vite 8 requires 20.19+/22.12+) for the frontend.
 - An LLM backend:
@@ -51,7 +46,7 @@ single-page app, so the whole thing runs on one origin.
 
 ## Quick start (development)
 
-Two terminals; full detail in [`INSTALL.md`](INSTALL.md) (Path A).
+Two terminals; full detail in [`docs/install.md`](docs/install.md) (Path A).
 
 ```bash
 # 1) backend on :8000  (export ANTHROPIC_API_KEY and/or OLLAMA_HOST first)
@@ -73,13 +68,13 @@ cd ../backend && uv run uvicorn app.main:app --port 8000
 ```
 
 When `frontend/dist/` exists the backend serves the SPA from `/` (same origin, no
-CORS). Open http://localhost:8000. See [`INSTALL.md`](INSTALL.md) (Path B).
+CORS). Open http://localhost:8000. See [`docs/install.md`](docs/install.md) (Path B).
 
 ## Docker
 
 A single-container build serves the SPA and the API on one origin. The sibling
 `sql2graph` repo is pulled in as a named build context, so both repos must be cloned
-side by side (see [`INSTALL.md`](INSTALL.md), Path C).
+side by side (see [`docs/install.md`](docs/install.md), Path C).
 
 ```bash
 cp .env.example .env              # then fill in ANTHROPIC_API_KEY and/or OLLAMA_HOST
@@ -87,7 +82,10 @@ docker compose up --build
 ```
 
 Open http://localhost:8000. Secrets are injected at runtime from `.env` (never baked
-into the image), and the container reports health via `GET /api/health`.
+into the image), and the container reports health via `GET /api/health`. The full set
+of backend environment variables is documented in the
+[environment variables section](docs/install.md#environment-variables-and-secrets) of
+`docs/install.md`.
 
 ## Validation modes
 
@@ -98,44 +96,30 @@ into the image), and the container reports health via `GET /api/health`.
   Docker (`managed`). The DB is reached from the **backend** host, so "localhost"
   means the server's localhost. The throwaway path needs a Docker daemon reachable
   from the backend; in the single-container Docker deployment, enable it with the
-  `docker-compose.docker-socket.yml` overlay (see [`INSTALL.md`](INSTALL.md)), or
+  `docker-compose.docker-socket.yml` overlay (see [`docs/install.md`](docs/install.md)), or
   enter an explicit connection instead.
-
-## Configuration
-
-The backend reads these from the process environment (it does not load a `.env` file
-itself; under Docker, Compose passes them in).
-
-| Variable | Purpose |
-|---|---|
-| `ANTHROPIC_API_KEY` | Read by the Anthropic SDK on the backend. |
-| `OLLAMA_HOST` | Default Ollama endpoint when the sidebar host override is blank. |
-| `SQL2GRAPH_CONFIG_DIR` | Override the library `config/` dir used for model-field defaults. Defaults to the sibling `../sql2graph/config`. |
-| `SQL2GRAPH_EXAMPLES_DIR` | Override the library `examples/` dir used for preset mappings. Defaults to the sibling `../sql2graph/examples`. |
 
 ## API
 
 All routes are served under the `/api` prefix. The two SSE endpoints surface invalid
-config as HTTP 400 before the stream opens.
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/health` | Liveness probe (`{"status": "ok"}`). |
-| GET | `/api/options` | Enums, library defaults, per-target valid modes, server-config defaults, and throwaway-DB availability, for building the forms. |
-| GET | `/api/presets` | Bundled tpch/ldbc mappings + sample SQL (backend only; the current UI does not auto-load them). |
-| POST | `/api/validate-mapping` | Validate a mapping YAML string; returns `{valid, errors, node_count, edge_count, graph}`. |
-| POST | `/api/build-mapping-stream` | SSE: stream the LLM naming conversation, then a `done` event carrying a schema mapping built from `CREATE TABLE` DDL. |
-| POST | `/api/detect-features` | The SQL features the translator detects, plus `parse_ok` (drives the feature chips). |
-| POST | `/api/check-coverage` | Live pre-flight: SQL tables/columns absent from the mapping (`unmapped_tables`, `unmapped_columns`, `parse_ok`). |
-| POST | `/api/translate` | SSE stream of the run: `status`, `conversation`, `generated`, `validated`, `fix`, `stalled`, `max_iterations`, `completed`, plus `parse_warning` / `unmapped_tables` / `unmapped_columns` and a synthetic `error`. |
+config as HTTP 400 before the stream opens. The full REST reference lives in
+[`docs/api.md`](docs/api.md).
 
 ## Documentation
 
+Deep documentation lives under `docs/`, start with the
+[documentation index](docs/README.md).
+
 | Document | Contents |
 |---|---|
-| [`INSTALL.md`](INSTALL.md) | Prerequisites, sibling-clone layout, and the manual / production / Docker run paths. |
-| [`backend/README.md`](backend/README.md) | The FastAPI app: module map, the SSE bridge, and configuration. |
-| [`frontend/README.md`](frontend/README.md) | The SPA: tech stack, structure, state model, and conventions. |
+| [`docs/architecture.md`](docs/architecture.md) | The mental model: the one-origin topology, sibling-repo coupling, both module maps, and the anatomy of a translate run. |
+| [`docs/install.md`](docs/install.md) | Prerequisites, the sibling-clone layout, the three run paths (manual, production, Docker), the env table, checks, troubleshooting. |
+| [`docs/api.md`](docs/api.md) | The REST reference: all eight routes, request models, response payloads, fail-soft semantics, and pre-stream HTTP 400 preconditions. |
+| [`docs/streaming.md`](docs/streaming.md) | The two SSE streams end to end: bridge queue and coalescing, event vocabulary, run lifecycles, teardown, client transport. |
+| [`docs/errors.md`](docs/errors.md) | Every way a run fails: pre-stream 400s, the synthetic error event, transport failures, fail-soft endpoints, warn vs reject pre-flight. |
+| [`docs/state.md`](docs/state.md) | The Zustand store: slices, active vs draft mapping, request building, debounced hooks, persistence and migration. |
+| [`docs/frontend.md`](docs/frontend.md) | SPA structure and conventions: the tech stack, per-file source tree, the two-workspace model, and UI conventions. |
+| [`docs/types.md`](docs/types.md) | The backend/frontend type mirror: every mirror point, why no codegen, degradation conventions, and the change checklists. |
 | [`obonovai/sql2graph`](https://github.com/obonovai/sql2graph) | The underlying library (cloned as the sibling `../sql2graph` on disk). |
 
 ## License
