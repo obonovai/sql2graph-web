@@ -7,15 +7,7 @@ wrapper: the backend calls the public `sql2graph` library API and adds no
 translation logic of its own. In production the backend also serves the built
 single-page app, so the whole thing runs on one origin.
 
-```
-┌Settings──┐ ┌ Header:  sql2graph · model · ☾ ──────────────────┐ ┌Chat──────┐
-│ LLM      │ │ Run setup:  Target ▾       [▸ Translate] [Clear] │ │ system ↔ │
-│ Valid.   │ │ ┌ Mapping │ SQL ┐    ║    ┌ Result ───────────┐  │ │ LLM      │
-│ (server) │ │ │  editor…      │    ║    │  generated query… │  │ │ stream   │
-│          │ │ └ ✓ 7 nodes·8 e ┘    ║    └ ✓ success · 2 it… ┘  │ │          │
-└──────────┘ └──────────────────────────────────────────────────┘ └──────────┘
-        (║ = the draggable divider between the Inputs and Result panes)
-```
+![sql2graph](img/sql2graph.png)
 
 ## Architecture
 
